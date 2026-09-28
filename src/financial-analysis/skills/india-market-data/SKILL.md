@@ -1,51 +1,169 @@
 ---
 name: india-market-data
-description: Where to get Indian market data for free — yfinance .NS equities and financials (verified), FRED keyless USD/INR, RBI and Indian macro sources, plus what is blocked and what has no free equivalent. Load this before any India task needing prices, Indian financials, consensus estimates, FX, or macro. Triggers on 'NSE data', 'BSE data', 'Indian stock data', 'share price of', 'quarterly results India', 'RBI repo rate', 'Indian financials', 'INR', 'USD/INR', 'NIFTY data'.
+description: Where to get Indian market data for free — NSE bhavcopy CSVs (whole-market OHLCV, no key), NSE allIndices/master-quote/corporate-announcements JSON, yfinance .NS financials and consensus, Screener.in shareholding, World Bank and IMF macro, Frankfurter INR. Documents what is blocked (quote-equity, BSE API, RBI G-sec feed, MOSPI) and what has no free equivalent. Load this before any India task needing prices, Indian financials, consensus, filings, or macro. Triggers on 'NSE data', 'BSE data', 'Indian stock data', 'share price of', 'quarterly results India', 'RBI repo rate', 'Indian financials', 'INR', 'USD/INR', 'NIFTY data', 'shareholding pattern'.
 ---
 
 # India market data (free)
 
-Source inventory for Indian equities and macro. Every claim below was **verified by a live call on
-2026-09-28**, not taken from documentation. Anything I could not confirm is marked **unverified** —
-check it on first use rather than trusting it.
+Source inventory for Indian equities and macro. Every claim was **verified by a live call on
+2026-09-28**. Anything unconfirmed is marked **unverified** — check it on first use rather than
+trusting it.
 
-For what is *absent*, read `NOT-ADAPTABLE.md`. For the accounting and unit conventions that make
+For what is **absent**, read `NOT-ADAPTABLE.md`. For the unit and calendar conventions that make
 Indian numbers interpretable, load `india-market-conventions`.
 
 > **The rule that matters most: never fabricate an Indian financial figure.** A plausible share
 > price or invented segment is worse than a gap, because it is indistinguishable from a real one to
 > whoever reads the output. If a source is unavailable: say so and name the blocker, ask the user,
-> or mark the cell `n/a — <reason>`. Never fill a table to make the deliverable look finished.
+> or mark the cell `n/a — <reason>`. Never fill a table to make a deliverable look finished.
 
 ---
 
-## 1. yfinance — the working primary source for Indian equities
+## 1. NSE Bhavcopy — the best free India source, and no-key
 
-This is the only route I found that works reliably headless. No key.
+A full-market daily OHLCV file per trading day. This is India's analogue of a bulk EOD price file;
+nothing in the US source list has an equivalent.
+
+```
+# from 2024-01-02
+https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_YYYYMMDD_F_0000.csv.zip
+# 2007-04-02 .. 2024-07-01
+https://nsearchives.nseindia.com/content/historical/EQUITIES/YYYY/MON/cmDDMMYYYYbhav.csv.zip
+```
+
+Auth: **none** — a browser `User-Agent` is all it takes. No cookie, no referer, no key.
+
+Verified 2026-09-28: the 20260925 file returned HTTP 200, a valid zip, and **3,654 securities**
+(TCS present, `SctySrs=EQ`, close 2082.00, volume 3,342,195).
+
+```python
+import zipfile, io, csv
+z = zipfile.ZipFile(path)
+rows = list(csv.DictReader(io.TextIOWrapper(z.open(z.namelist()[0]), encoding="utf-8-sig")))
+eq = [r for r in rows if r["SctySrs"] == "EQ"]      # other series are bonds — filter
+```
+
+Columns include `TckrSymb`, `ISIN`, `SctySrs`, `OpnPric`, `HghPric`, `LwPric`, `ClsPric`,
+`PrvsClsgPric`, `TtlTradgVol`, `TtlTrfVal` (INR).
+
+### Four things that will silently corrupt your data
+
+1. **Path changed on 2024-01-02.** Old `2024/JUL/cm01JUL2024bhav` = 200 but
+   `2024/AUG/cm01AUG2024bhav` = **404**; new `20240102` = 200 but `20231229` = **404**. **Try both
+   forms for any date before 2024-01-02.**
+2. **404 means "no trading session", not failure.** Verified: 2026-09-26 was a Sunday -> 404. A
+   naive scraper treats that as an error and builds a gappy price history.
+3. **Prices are raw and unadjusted.** Bhavcopy is not comparable to adjusted yfinance OHLC. Mixing
+   them produces fake gaps at every split and dividend — RELIANCE.NS had a 2:1 split on 2024-10-28.
+4. **Join on `ISIN`, never on scrip code.** Reliance is NSE `2885` *and* BSE `500325` — one company,
+   one ISIN, two scrip codes. Bhavcopy carries ISIN; use it as the universal key.
+
+One file per trading day, so ~1,600 HTTP calls for six years. Fetch 5-10 in parallel and cache.
+
+---
+
+## 2. NSE JSON API — mostly works, two paths are hard-blocked
+
+Base `https://www.nseindia.com/api/<path>`, no key, but Akamai-fronted. **Not uniformly available:**
+
+| Endpoint | Status |
+|---|---|
+| `allIndices` | **works** — verified NIFTY 50 last 22780.25, P/E 19.26, P/B 2.75; INDIA VIX 13.69 |
+| `marketStatus` | works |
+| `master-quote` | works — but a **flat symbol list (210 symbols)**, *not* the full 3,654 universe, and **not** index membership |
+| `corporate-announcements?index=equities&symbol=X` | **works** — verified 3,353 records for RELIANCE with `desc`, `attchmntText`, `attchmntFile` (PDF URL). This is the EDGAR-`submissions` analogue. Referer `https://www.nseindia.com/companies-listing/corporate-filings` |
+| `corporates-financial-results?index=equities&symbol=X` | works — result filings |
+| `corporate-board-meetings?index=equities` | works — earnings calendar |
+| `live-analysis-variations?index=gainers&type=FOSec` | works |
+| **`quote-equity?symbol=X`** | **403 Akamai, for every symbol and every header set** — a per-path WAF rule, not a missing-header problem |
+| `historical/*`, `equity-stockIndices`, `corporate-actions`, `corporates-shareholding-pattern` | **404 / 503** — retired |
+
+**Treat `quote-equity` as unavailable.** It is the URL a US-derived scraper tries first, and it is
+the one that fails. Build on bhavcopy and yfinance.
+
+NSE also publishes a daily index file, no key, no cookie:
+```
+https://nsearchives.nseindia.com/content/indices/ind_close_all_DDMMYYYY.csv
+```
+Verified back to at least 2018; includes OHLC, P/E, P/B, and div yield per index.
+
+### BSE — no usable free API
+
+`api.bseindia.com/BseIndiaAPI/api/*` returns **403 Akamai on every endpoint**; `bseindia.com` serves
+a 14 KB SPA shell for every path. **Use `.NS` and Screener instead.** May differ from other
+networks — unverified globally.
+
+---
+
+## 3. yfinance `.NS` — the workhorse
 
 ```python
 import yfinance as yf
 t = yf.Ticker("RELIANCE.NS")
-t.history(period="1y")          # OHLCV
+t.history(period="1y")        # OHLCV (adjusted)
 t.income_stmt, t.balance_sheet, t.cashflow
+t.quarterly_income_stmt       # populated for SOME tickers — gate on shape
+t.dividends, t.splits
 t.earnings_estimate, t.revenue_estimate, t.eps_trend, t.eps_revisions
-t.analyst_price_targets, t.fast_info
+t.analyst_price_targets, t.recommendations
 ```
 
-**Verified working on 2026-09-28:**
+### Use `.NS`. Do not use `.BO`.
 
-| Capability | Result |
+`.BO` returns **0- or 1-row garbage** for almost everything. Verified 2026-09-28 on a one-month
+window: `RELIANCE.BO` 1 row · `INFY.BO` 1 · `SBIN.BO` 1 · `HDFCBANK.BO` 1 · `ITC.BO` 1 ·
+`TCS.BO` 21 (the only clean one). It looks like *missing data* rather than an error, so you will
+not notice unless you check row counts.
+
+### Fiscal framing comes for free
+
+Annual statement columns are **fiscal year-end March** — `2026-03-31`, `2025-03-31`, `2024-03-31`.
+Do not re-map them. Verified RELIANCE.NS FY2026: Total Revenue Rs 10,572.2bn, EBITDA Rs 2,049.1bn,
+Net Income Rs 807.8bn.
+
+**Quarterly statements work for some tickers, not all.** Verified `TCS.NS`
+`quarterly_income_stmt` = 48 rows x 6 columns dated `2026-06-30, 2026-03-31, 2025-12-31,
+2025-06-30, 2025-03-31, 2024-12-31` (fiscal quarters Mar/Jun/Sep/Dec), Total Revenue
+Rs 722.8bn / 707.0bn / 670.9bn / 634.4bn. Coverage is uneven, so **gate every ticker**:
+
+```python
+q = t.quarterly_income_stmt
+if q is None or q.shape[1] < 2:      # fall back to annual, and say you did
+    ...
+```
+
+### ROE and ROCE are absent
+
+`.info` returns `returnOnEquity: None` and `returnOnAssets: None` for India (verified on
+RELIANCE.NS). Other ratios *are* present: `trailingPE` 21.71, `priceToBook` 1.79,
+`enterpriseToEbitda` 10.75, `profitMargins`, `ebitdaMargins`, `payoutRatio`, `dividendYield`,
+`marketCap`, `52WeekChange`.
+
+**Compute ROE yourself** — net income / average equity, both from `income_stmt` and
+`balance_sheet`, as live formulas. Same for ROCE (EBIT / capital employed). Do not present a
+missing ratio as zero.
+
+### Consensus — real, but check the analyst count
+
+| Field | Verified |
 |---|---|
-| Prices | RELIANCE ₹1197.60 · TCS ₹2070.70 · HDFCBANK ₹719.05 · INFY ₹1003.20 · SBIN ₹962.00 |
-| Currency | `fast_info['currency']` = `INR` — confirms the listing, catches wrong-venue errors |
-| **Annual financials** | `income_stmt` 50 rows × 5 years; **column dates are fiscal year-end March** — `2026-03-31`, `2025-03-31`, `2024-03-31`. Indian FY framing comes for free; do not re-map it. |
-| Consensus | RELIANCE 0y EPS avg ₹63.95, **27 analysts**; revenue 0y avg ₹11,835,899,262,950 (27 analysts) |
-| Revision history | `eps_trend` has `current / 7daysAgo / 30daysAgo / 60daysAgo / 90daysAgo` — real revision data, not a placeholder |
-| Price targets | RELIANCE mean ₹1676.85, median ₹1690, high ₹1890, low ₹1350 |
+| `earnings_estimate` | RELIANCE 0y EPS avg Rs 63.95, **27 analysts**; TCS 0y **34**, +1y **38** |
+| `revenue_estimate` | TCS 0q Rs 726.5bn, **11 analysts**, INR |
+| `eps_trend` | `current / 7daysAgo / 30daysAgo / 60daysAgo / 90daysAgo` — real revision history |
+| `eps_revisions` | `upLast7days / upLast30days / downLast7Days / downLast30days` |
+| `analyst_price_targets` | RELIANCE mean Rs 1676.85, median Rs 1690, high Rs 1890, low Rs 1350 |
+| `recommendations` | strongBuy/buy/hold/sell/strongSell counts by month |
+
+- Analyst counts are **small for quarters** (7-11) and thin for some large caps (**IRFC returned 1**;
+  BEL 21, SUZLON 12, YESBANK 10). **Quote `n=` or don't quote the consensus** — a one-analyst
+  "consensus" is one analyst's view.
+- `revenue_estimate` has **no 7/30/60/90-day-ago columns**, so **revenue revision history does not
+  exist** in this source. Output `n/a`; do not construct one.
+- Yahoo-sourced, not IBES. Do not compare an India consensus to a US IBES figure as like-for-like.
 
 ### Install it properly
 
-yfinance warns at import if `curl_cffi` is missing, and then **Yahoo may rate-limit or block you**:
+Without `curl_cffi`, yfinance prints a warning and runs on a fallback path that gets throttled:
 
 ```
 curl_cffi not available; falling back to requests without browser TLS impersonation.
@@ -56,135 +174,173 @@ Yahoo Finance may rate-limit or block this client. Install curl_cffi (>=0.15)
 pip install yfinance curl_cffi
 ```
 
-`curl_cffi` does browser TLS impersonation and is the supported configuration. Without it you are on
-a fallback path that gets throttled. This is advisory output on stderr, not an exception — it is
-easy to miss, and the failure shows up later as empty results rather than as a crash.
+It is stderr advisory, not an exception, so the failure surfaces later as empty results.
 
-### Caveats that belong in your output
+### Indices
 
-- Scrapes an API Yahoo has no official contract for. "Personal use only" per its README. Not a
-  production or commercial path.
-- **All data is EOD or delayed.** None of it is tick-accurate or real-time. Say so.
-- Only **annual** financials came back in my test. Quarterly statement data was not populated —
-  for quarterly figures go to the company's results filing, not yfinance.
+`^NSEI` (NIFTY 50) · `^BSESN` (Sensex) · `^NSEBANK` · `^CNXIT` · `^INDIAVIX` — all live. Cross-check:
+`^NSEI` 22780.25 matched NSE `allIndices` NIFTY 50 22780.25 exactly. `^INDIAVIX.NS` and
+`NIFTY_IT.NS` do **not** work — use the bare `^` form.
 
----
+### Symbol traps — resolve before you build
 
-## 2. Symbol traps — resolve before you build
-
-A wrong ticker **404s or returns a delisted warning**; it does not degrade gracefully. Two
-confirmed traps:
+A wrong ticker **404s or warns**; it does not degrade.
 
 | Trap | Detail |
 |---|---|
-| `INDIA.NS` → 404 | **State Bank of India is `SBIN.NS`.** The "obvious" ticker is wrong. |
-| `TATAMTRDVR.NS` → *"No data found, symbol may be delisted"* | Tata Motors demerged. Symbols break on corporate action, exactly like the price series. |
-
-**Always confirm before you build on a symbol:**
+| `INDIA.NS` -> 404 | State Bank of India is **`SBIN.NS`**. The obvious ticker is wrong. |
+| `TATAMTRDVR.NS` -> *"No data found, symbol may be delisted"* | Tata Motors demerged. Symbols break on corporate action, like price series. |
 
 ```python
 f = yf.Ticker(sym).fast_info
-assert f.get("lastPrice"), f"{sym} returned no price — wrong or dead symbol"
-assert f.get("currency") == "INR", f"{sym} is not an INR listing"
+assert f.get("lastPrice"), f"{sym}: wrong or dead symbol"
+assert f.get("currency") == "INR", f"{sym}: not an INR listing"
 ```
-
-That second assertion is worth having: it catches a `.BO`/`.NS` mix-up and a foreign listing in one
-line. Verified NIFTY-family symbols: `RELIANCE.NS` `TCS.NS` `HDFCBANK.NS` `INFY.NS` `ITC.NS`
-`SBIN.NS` `LT.NS` `BHARTIARTL.NS` `AXISBANK.NS` `KOTAKBANK.NS` `MARUTI.NS` `BAJFINANCE.NS`
-`ADANIENT.NS` `HINDUNILVR.NS` `WIPRO.NS` `TATASTEEL.NS` `HCLTECH.NS` `SUNPHARMA.NS` `ASIANPAINT.NS`
-`YESBANK.NS` `SUZLON.NS` `BEL.NS` `IRFC.NS`.
-
-Suffixes: `.NS` = NSE, `.BO` = BSE. Most large caps list on both.
 
 ---
 
-## 3. FX — FRED keyless, no API key
+## 4. Screener.in — shareholding and 10-year history
 
-The one India series I confirmed works without a key:
+No API, but a plain scrape works: `https://www.screener.in/company/RELIANCE/consolidated/` returns
+200 with server-rendered HTML. Verified sections: `quarters` (13 rows), `profit-loss` (33 rows,
+**Mar-2015 onward**), `balance-sheet` (11), `cash-flow` (7, incl. Free Cash Flow), and
+**`shareholding` (14 rows: Promoters / FIIs / DIIs / Government / Public, by quarter)** — the
+practical free source for shareholding pattern and promoter trends.
 
-```
-https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXINUS&cosd=2026-09-01
-```
-```
-observation_date,DEXINUS
-2026-09-01,94.9500     ← INR per USD
-2026-09-02,94.9700
-```
+> **Units differ by source, and the gap is 10 million x.** Screener reports in **Rs crore**;
+> yfinance reports in **raw INR**. Mixing them without dividing is a **10,000,000x error**, and it
+> is invisible because both look like plausible money. Convert explicitly, in a formula, and label
+> the unit. World Bank reserves and market cap come in **US$** — a third unit in the same deck.
 
-Same no-key trick as the rest of FRED. Useful companions to check on first use (not verified here):
-other `DEX*` pairs, and Indian macro series on FRED/DBnomics. World Bank and IMF DataMapper cover
-India GDP/CPI/reserves and need no key.
-
-**Not available:** forward points and NDF curves. Any INR carry figure is a spot-differential
-proxy and must be labelled one.
+Not bot-blocked, but no contract and no export (a free account exists; export is premium). Be
+polite, cache hard. Use `lxml` / `beautifulsoup4` rather than regex.
 
 ---
 
-## 4. Blocked or unusable from here — tested, not assumed
+## 5. Macro
 
-I tested the two obvious Indian exchange APIs directly. **Both are blocked at the edge from this
-network**, with and without a session cookie:
-
-| Endpoint | Result |
-|---|---|
-| `https://www.nseindia.com/api/quote-equity?symbol=RELIANCE` | Akamai **"Access Denied"**. Homepage returns 302; API still denied with a fetched cookie jar and full browser headers. |
-| `https://api.bseindia.com/BseIndiaAPI/api/StockReachGraph/w?scripcode=500325` | Akamai **"Access Denied"**. |
-
-These endpoints are widely documented and may work from a residential IP or a different network.
-Treat them as **environment-dependent, not available-by-default** — try them, but never make them
-the only path to a number, and never assume a successful call means the data is Indian (check the
-currency and the FY-end dates).
-
-If you need NSE/BSE-native data and the direct call is blocked, the realistic free routes are
-yfinance, or a brokerage API with a free account (Angel One, Zerodha Kite, Upstox, Dhan) — each
-needs signup and a session, and each has its own auth model, so verify before relying on one.
-
----
-
-## 5. Consensus coverage is real but uneven
-
-Unlike the US, India consensus exists free — but **quote the analyst count or don't quote it.**
-
-Verified analyst counts (0y EPS): BEL **21** · SUZLON **12** · YESBANK **10** · RELIANCE **27** ·
-IRFC **1**.
-
-So:
-- A single-analyst "consensus" is one analyst's view, not a consensus. **Say `n=1`.**
-- Quarterly (`0q`/`+1q`) coverage is far thinner than annual — RELIANCE had **2** analysts
-  quarterly against 27 annual. A beat/miss call on 2 analysts is not a signal.
-- `revenue_estimate` carries **no 7/30/60/90-day-ago columns** — so **revenue revision history
-  does not exist** in this source, same as in the US one. Output `n/a`; do not construct one.
-- The source is Yahoo, not IBES. Do not compare an India consensus to a US IBES figure as
-  like-for-like.
-
----
-
-## 6. Macro and filings — the weak spots
-
-| Need | Status |
-|---|---|
-| CPI, WPI, GDP, IIP | Published by MOSPI / NSO / Office of the Economic Adviser. Historically **PDF/HTML-first and lagged**, not a clean API — **unverified** as machine-readable. Extract from the release and cite the release date. |
-| RBI repo rate, G-sec yields | **No free machine-readable feed found.** Tested 2026-09-28: `rbi.org.in` pages return HTTP 200 but are **HTML, not an API** (DBIE, MAS circulars, press releases); DBnomics has **no RBI provider** (404); FRED keyless has **no India 10Y G-sec series** (the plausible id returns an error page). An Indian WACC therefore needs the 10Y G-sec **read off an RBI/NSE curve for the valuation date and hand-sourced with its date** — it cannot be pulled from a free API. This is the single largest India data gap; see `NOT-ADAPTABLE.md`. |
-| Company financials | yfinance annual statements (above), or the company's own results/annual report. |
-| Statutory filings | **MCA21**, behind a login, not API-friendly. There is **no Indian EDGAR** — no single free, complete, machine-readable filing database. |
-| Shareholding pattern, promoter pledge, RPT | BSE/NSE publish these. Current disclosure is available; a reliable multi-year series is not free. |
-| Credit ratings | No free feed comparable to S&P's. Read from the company's own filings. |
-| Funding rounds / private raises | **No Form D equivalent.** This is why `funding-digest` does not port — see `NOT-ADAPTABLE.md` §3.2. |
-| Precedent M&A transactions | No free structured database. Cite each deal individually. |
-
----
-
-## 7. Provenance convention
-
-Every figure in a deliverable carries a source and a retrieval date, per `xlsx-author` and
-`pptx-author`:
+### World Bank v2 — the one reliable free India macro set (keyless)
 
 ```
+https://api.worldbank.org/v2/country/IND/indicator/<ID>?format=json&mrnev=1
+```
+
+| ID | Series | India (verified 2026-09-28) |
+|---|---|---|
+| `FP.CPI.TOTL.ZG` | CPI inflation, annual % | **2.399** (2025) |
+| `NY.GDP.MKTP.KD.ZG` | Real GDP growth % | 7.567 (2025) |
+| `SL.UEM.TOTL.ZS` | Unemployment % | 4.219 (2025) |
+| `FI.RES.TOTL.CD` | Total reserves incl. gold, US$ | $700.07bn (2025) |
+| `PA.NUS.FCRF` | Official FX rate, INR/USD period avg | 87.158 (2025) |
+| `CM.MKT.LCAP.CD` | Listed domestic market cap, US$ | $10.56tn (2025) |
+| `NY.GDP.MKTP.CD` | GDP current US$ | $3.76tn (2024) |
+
+**Annual frequency, ~1-year lag.** Not a substitute for monthly CPI — but the only genuinely
+machine-readable free India macro set.
+
+### IMF DataMapper / DBnomics — keyless, but these are *projections*
+
+`https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/IND` and `.../PCPIPCH/IND` work.
+**WEO values include out-years to 2031 — never present one as an actual.** DBnomics has **no RBI,
+MOSPI, or SEBI provider** (all 93 providers enumerated).
+
+### FRED — FX only for India
+
+```
+https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXINUS
+```
+INR per USD, 14,014 daily rows from 1973-01-02, last **95.87** (2026-09-18). No key.
+
+FRED has **no** India GDP/CPI/reserves series (`INDPGDP`, `INDGDP`, `MKTGDP`, `WPUFN` all 404), and
+`DEXINUS` **lags ~10 days** behind market. Use it for long history, not for anything current.
+
+### Frankfurter — better for current INR, already in the skill set
+
+`https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR` -> **95.98** (2026-09-28). Range form
+`/v1/2026-09-18..2026-09-28?base=USD&symbols=INR` gives the full daily series. ECB-backed, keyless,
+**no change needed to the existing FX step**. Reference/mid rates — not tradeable quotes.
+
+### RBI — the hardest gap, and there is no free G-sec feed
+
+Tested hard; this is a genuine negative.
+
+- `dbie.rbi.org.in` — connection dead. `api.rbi.org.in` — does not resolve.
+- `data.rbi.org.in` — 200 but a **50 KB Angular SPA**; every plausible JSON route **404s**.
+- `www.rbi.org.in` ASPX pages return 200 (press releases, Weekly Statistical Supplement, Handbook of
+  Statistics, `bs_viewcontent.aspx?Id=1956` = GoI securities outstanding) but are **HTML tables and
+  Excel attachments**, not an API. Scrape-fragile and unversioned.
+- Every NSE bond route 404s (`gsec-indices`, `live-g-sec-indices`, `gsec`, `bond-data`).
+
+**The one thing that works is a third-party mirror:** `https://dbie.rbihub.in/` is server-rendered
+and yields a **policy repo rate 5.25% (Jul 2026)**, CPI 4.38% (Jun 2026), real GDP 8.2%,
+FX reserves $785.7bn. **Cite it as `dbie.rbihub.in (RBI DBIE mirror)`, not as RBI**, and expect it
+to break.
+
+**Consequence for WACC — the important part:** there is **no free Indian 10Y G-sec yield**. Make the
+risk-free rate a **required manual input** sourced from the RBI WSS HTML for the valuation date, or
+ask the user. Do not let an agent invent one. A repo-rate proxy is defensible only if labelled a
+proxy, never a G-sec. See `NOT-ADAPTABLE.md` section 3.11.
+
+### MOSPI / NSO — not machine-readable
+
+`mospi.gov.in` returns an identical 2,644-byte SPA shell for every path. `api.mospi.gov.in` serves a
+Swagger UI, but every spec and data path returns the SPA shell — **no endpoint could be verified.**
+`api.data.gov.in` requires a key per resource. **Treat monthly CPI/WPI/GDP/IIP as PDF/scrape-only**,
+and cite the release date because they are lagged.
+
+---
+
+## 6. Broker APIs — free, if you need an account
+
+Verified package existence; **authenticated calls not tested**.
+
+| Broker | Package | Free? | Auth |
+|---|---|---|---|
+| **Dhan** | `dhanhq` 2.2.0 | **yes** | client-id + access-token (JWT) |
+| **Fyers** | `fyers-api` 1.0.9 | **yes** | app_id + app_secret -> access_token |
+| Zerodha Kite | `kiteconnect` 5.2.2 | **no — paid subscription** | key+secret + daily session login, TOTP via `pyotp` |
+| Upstox | **not on PyPI** (GitHub only) | yes, with account | unverified |
+| Angel One | GitHub only | yes, with account | unverified |
+
+> **⚠️ PyPI trap:** `pip install smartapi` installs **"Smart API RDF model manipulation in Python"** —
+> an unrelated ontology library, not Angel One's SDK. Angel One ships from GitHub under a different
+> name. An agent that installs it will fail confusingly.
+
+**Broken India packages — do not use:** `nsetools` 2.0.1 imports but `get_quote` throws
+`JSONDecodeError` (it receives the 403 HTML). `nsepy` 0.8 is abandoned (2019).
+
+Prefer **Dhan** or **Fyers** if a free-with-account API is wanted; Zerodha is not free.
+
+---
+
+## 7. What has no free equivalent
+
+See `NOT-ADAPTABLE.md` for the full register. The short list most likely to be hit:
+
+- Real-time / tick data (everything free is EOD or ~15-min delayed)
+- **Indian 10Y G-sec / government yield curve** (RBI is HTML-only)
+- **NIFTY 50 / Sensex constituent lists** via API (`equity-stockIndices` is retired)
+- Indian XBRL structured statements — no `companyconcept` analogue; filings are PDFs
+- ROE / ROCE pre-computed (compute from statements)
+- Promoter **pledge** data, structured (PDFs and paid aggregators only)
+- Insider trades (LODR Reg 29/31) and SAST — `insider_transactions` is empty for India
+- Bulk consensus for 500+ names (per-ticker only; cache hard)
+- BSE-scoped data, MOSPI monthly data, credit spreads, options vol surfaces
+- SEC Form D equivalent -> **`funding-digest` does not port**
+
+---
+
+## 8. Provenance convention
+
+```
+Source: NSE bhavcopy 2026-09-25 (raw/unadjusted), retrieved 2026-09-28
 Source: yfinance RELIANCE.NS annual statements, FY ending 2026-03-31, retrieved 2026-09-28
 Source: yfinance consensus (n=27 analysts, Yahoo-sourced), retrieved 2026-09-28
-Source: FRED DEXINUS (INR per USD), retrieved 2026-09-28
-Source: MOSPI CPI release for <month>, retrieved <date>   [lagged — state the release date]
+Source: Screener.in shareholding pattern, quarter ending Sep-24, retrieved 2026-09-28 (Rs crore)
+Source: World Bank v2 FP.CPI.TOTL.ZG, India 2025, retrieved 2026-09-28 (annual, ~1yr lag)
+Source: Frankfurter INR/USD reference rate 2026-09-28, retrieved 2026-09-28
+Source: dbie.rbihub.in (RBI DBIE mirror — not RBI), policy repo rate 5.25% Jul-2026
 ```
 
-And state plainly that free Indian sources are **EOD/delayed, not real-time**, rather than letting
-a table imply live pricing.
+State plainly that free Indian sources are **EOD/delayed, not real-time**, and give the **unit** on
+every figure — raw INR, Rs crore, and US$ all appear in the same deliverable.

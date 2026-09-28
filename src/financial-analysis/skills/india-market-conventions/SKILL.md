@@ -51,6 +51,20 @@ the source value once (raw rupees, blue input), derive crore and lakh from it in
 cells, and label the derived column `Total Revenue (₹ Cr)`. Then the model flexes and the unit is
 visible in the header, which is the only place a reader will look for it.
 
+### Three units, one deliverable
+
+Verified 2026-09-28 — these three coexist and are **not** the same scale:
+
+| Source | Unit |
+|---|---|
+| yfinance | **raw INR** |
+| Screener.in | **Rs crore** |
+| World Bank (reserves, market cap, GDP) | **US$** |
+
+Screener and yfinance differ by 10⁷. Mixing them without an explicit conversion is a silent
+10,000,000x error that looks like plausible money in every cell. Convert in a **formula** and label
+every column.
+
 ### Reading a unit from any source
 
 Confirm it before you use it. Indian filings, screeners and data vendors mix rupee, thousand,
@@ -123,6 +137,13 @@ and treat cross-jurisdiction multiples as directional only.
 S&P 500 — different constituent count, different construction, different free-float treatment.
 Carrying a US-derived "index" reference into an Indian model is a silent methodology error.
 
+**Levels are free; membership is not.** `equity-stockIndices` (the NIFTY 50 constituent endpoint)
+is retired — 404. Take the list from the provider factsheet or derive it, and **never** substitute a
+"top 50 by market cap" proxy and label it the NIFTY 50.
+
+**Join on ISIN, not scrip code.** Reliance is NSE `2885` and BSE `500325` — one company, one ISIN,
+two scrip codes.
+
 ### Market-cap bands
 
 SEBI classifies by market capitalisation, and the bands are periodically revised. Use the current
@@ -133,10 +154,16 @@ whole sets of companies between periods.
 
 ## 5. Price and trading mechanics
 
-- **Circuit limits.** Indian equities have index- and stock-specific upper/lower circuit bands
-  (commonly 2%, 5%, 10%, 20%). A price series containing a circuit-bound print is **not a traded
-  price** — it is a limit. A close on zero or near-zero volume is a data point to exclude, not one
-  to chart. Sanity-check volume before trusting a return.
+- **Circuit limits.** Indian equities carry daily upper/lower circuit bands. The general level is
+  **20%**, raised to **25%** for stocks in the F&O segment, with 2% and 10%/15% bucket bands also in
+  use. A price series containing a circuit-bound print is **not a traded price** — it is a limit. A
+  close on zero or near-zero volume is a point to exclude, not to chart. Sanity-check volume before
+  trusting a return.
+
+  **A ±10% daily-move filter written for US markets will false-positive constantly here** — a normal
+  Indian day can be well past it. Use a circuit-aware bound, or none at all.
+- **Short selling is largely prohibited** (intraday in F&O scrips only). Bearish-pressure logic
+  carried from a US playbook does not transfer.
 - **Settlement.** The standard is T+1, with an optional T+0 intraday segment. Any
   working-capital, receivable-days or cash-conversion figure built on a single settlement lag is
   wrong for part of the book. State the assumption.
