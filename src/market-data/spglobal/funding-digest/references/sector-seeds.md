@@ -1,103 +1,129 @@
-# Sector Seed Companies Reference
+# Sector Seeds & Query Terms
 
-When the user specifies a sector but not specific companies, use these seed lists to bootstrap the company universe. These are starting points — always expand via `get_competitors_from_identifiers` and validate with `get_info_from_identifiers`.
+The old seeds were **company names to resolve against an identifier system**. EDGAR inverts that:
+Form D is a *filing corpus*, so a "seed" is now a **query term** — the phrase you put in `q=` — plus
+the industry keywords and SIC codes you use to filter the results.
 
-> **All seeds below have been validated against S&P Global's identifier system.** If a seed fails to resolve, try the alias listed in parentheses before dropping it.
+> **Everything below is a starting point, not ground truth.** EDGAR full-text search matches the
+> *document text*, not a structured round field. Every sector query returns noise. Apply the noise
+> filter in "Filtering" below before you count anything, and report the filtered count.
 
-## Technology / Software
+## How to use a sector row
 
-### AI / Machine Learning
-Seeds: OpenAI, Anthropic, Databricks, Scale AI, Cohere, Hugging Face, Mistral AI, xAI, Perplexity AI, Runway ML (alias: "Runway AI, Inc."), Together AI (alias: "Together Computer, Inc."), Character.ai (alias: "Character Technologies, Inc."), Groq, Stability AI, Aleph Alpha, Magic AI
+For a biotech digest, for example:
 
-⚠️ **Excluded (do not use as seeds):**
-- *Inflection AI* — Core team absorbed by Microsoft (Mar 2024). Historical rounds exist but no new activity.
-- *Adept AI* — Largely absorbed by Amazon (2024). Same as above.
-- *DeepMind* — Subsidiary of Alphabet. No independent funding rounds.
+```bash
+# 1. Round-label pass
+curl -s 'https://efts.sec.gov/LATEST/search-index?q=%22Series+A%22&forms=D&dateRange=custom&startdt=2026-01-01&enddt=2026-02-01'
+# 2. Industry-keyword pass
+curl -s 'https://efts.sec.gov/LATEST/search-index?q=%22biotechnology%22&forms=D&dateRange=custom&startdt=2026-01-01&enddt=2026-02-01'
+```
 
-### Cybersecurity
-Seeds: CrowdStrike, Palo Alto Networks, Wiz, Snyk, SentinelOne, Abnormal Security, Netskope
+Dedupe on `adsh`, filter, rank by `Total Offering Amount` from the filing, and take the top 6.
 
-### Cloud Infrastructure / DevTools
-Seeds: Snowflake, HashiCorp, Datadog, Confluent, Vercel, Supabase, PlanetScale
+---
 
-### Fintech
-Seeds: Stripe, Plaid, Brex, Ramp, Mercury, Affirm, Marqeta, Navan
+## Query terms by sector
 
-### Vertical SaaS
-Seeds: ServiceTitan, Toast, Procore, Veeva Systems, Blend Labs
+| Sector | `q=` round-label phrases | `q=` industry keywords | SIC tiebreak |
+|---|---|---|---|
+| **AI / machine learning** | `"Series A"`, `"Series B"`, `"Series Seed"` | `"artificial intelligence"`, `"machine learning"` | 3571, 7372 |
+| **Cybersecurity** | `"Series A"`, `"Series B"` | `"cybersecurity"`, `"information security"` | 7372 |
+| **Devtools / cloud infrastructure** | `"Series A"`, `"Series B"`, `"Series C"` | `"software as a service"`, `"cloud infrastructure"` | 7372, 7371 |
+| **Fintech** | `"Series A"`, `"Series B"`, `"Series C"` | `"financial technology"`, `"payments"` | 6021, 6199, 7372 |
+| **Biotech / pharma** | `"Series A"`, `"Series B"`, `"Series C"` | `"biotechnology"`, `"therapeutics"`, `"clinical trial"` | 2834, 2836 |
+| **Digital health** | `"Series A"`, `"Series B"` | `"digital health"`, `"telehealth"` | 8062, 8011, 7372 |
+| **Medical devices** | `"Series A"`, `"Series C"` | `"medical device"`, `"medical technology"` | 3841, 8011 |
+| **Climate tech / clean energy** | `"Series A"`, `"Series B"` | `"clean energy"`, `"energy storage"`, `"carbon capture"` | 3674, 3690, 4911 |
+| **Space / aerospace** | `"Series A"`, `"Series C"` | `"aerospace"`, `"satellite"` | 3760, 3721 |
+| **Robotics / automation** | `"Series A"`, `"Series B"` | `"robotics"`, `"industrial automation"` | 3569, 7379 |
+| **Logistics / supply chain** | `"Series B"`, `"Series C"` | `"supply chain"`, `"logistics"` | 4210, 4731, 7372 |
+| **Consumer / marketplace** | `"Series A"`, `"Series B"` | `"e-commerce"`, `"marketplace"` | 5961, 7372 |
+| **Consumer social / media** | `"Series A"`, `"Series B"` | `"social media"` | 7372, 4899 |
 
-## Healthcare / Life Sciences
+SIC codes are **coarse and optional** — most Form D filings carry none (104 of 106 in a verified
+January 2026 query). Use them only to break ties, never to build the universe.
 
-### Biotech / Pharma
-Seeds: Moderna, BioNTech, Recursion Pharmaceuticals, Tempus AI, Insitro, AbCellera
+---
 
-### Digital Health
-Seeds: Teladoc, Hims & Hers, Ro, Noom, Color Health
+## Filtering — the noise you will actually hit
 
-⚠️ **Excluded (do not use as seeds):**
-- *Cerebral* — Still operating but has faced significant regulatory issues; include only if the user specifically requests it.
+`q="Series A"` over January 2026 returned **106** Form D filings, and the top results were overwhelmingly
+**real-estate and fund vehicles**, not venture startups:
 
-### Medical Devices
-Seeds: Intuitive Surgical, Butterfly Network, Outset Medical
+```
+SSC Alight Fullerton 2025 Sub REIT LLC      AREG US Fund XI REIT 1-3 LLC
+SSC Lark Charlotte 2025 Sub REIT LLC         Whale Rock MegaCap Tech Fund Ltd.
+FAIRFIELD CP III REIT I LLC                  Align Ventures Co-Invest Fund, LP
+```
 
-⚠️ **Excluded (do not use as seeds):**
-- *Shockwave Medical* — Acquired by Johnson & Johnson (May 2024). Now a subsidiary with no independent funding rounds.
+These are real filings and they do not belong in a venture digest. **Drop** any entity whose name
+contains:
 
-## Energy / Climate
+`REIT` · `Fund` · `L.P.` · `LLC - Series` · `Co-Invest` · `Blind Pool` · `Statutory Trust` ·
+`Sub REIT` · `Distribution Center` · `Storage` · `Mortgage`
 
-### Climate Tech
-Seeds: Redwood Materials, Form Energy, Commonwealth Fusion, Sila Nanotechnologies, Climeworks
+Or whose SIC is a real-estate code (`6798`, `6799`, `6722`, `6513`, `6099`).
 
-### Clean Energy
-Seeds: Enphase Energy, First Solar, Rivian, QuantumScape, Sunnova
+**Report the filtered count and the dropped count.** `hits.total` is a search-engine total, not a
+round count — printing it as "Series A rounds" is the single most common error in this workflow.
 
-## Consumer
+---
 
-### E-Commerce / Marketplace
-Seeds: Shopify, Faire, Whatnot, Fanatics
+## Exclusion list — issuers that will never appear
 
-⚠️ **Excluded (do not use as seeds):**
-- *Temu (PDD Holdings)* — PDD Holdings is a massive public conglomerate; its funding activity is captured via equity markets, not venture rounds.
+These have no independent Form D. The reason has changed from "resolves as a subsidiary" to "does not
+file its own Reg D notice," so **do not report them as "no activity"** — report them as **out of
+scope** or drop them silently.
 
-### Consumer Social / Media
-Seeds: Discord, Reddit, Substack
+### Subsidiaries and divisions (no separate filing)
+DeepMind (Alphabet) · GitHub (Microsoft) · Instagram, WhatsApp, YouTube (Meta) · BeReal (Voodoo) ·
+Lemon8 (ByteDance) — also beware that the string "Lemon8" also matches a small unrelated Dutch
+registrant.
 
-⚠️ **Excluded (do not use as seeds):**
-- *BeReal* — Acquired by Voodoo (Jun 2024). Now a subsidiary.
-- *Lemon8* — The brand name "Lemon8" resolves in S&P Global to a small Dutch company (Lemon8 B.V.), **not** the ByteDance social media app. ByteDance's apps are subsidiaries and do not have independent funding rounds. Do not use.
+### Defunct or wound down
+Convoy (shut down Oct 2023) · Inflection AI (core team absorbed by Microsoft, Mar 2024) · Adept AI
+(largely absorbed by Amazon, 2024) · Cerebral (still operating; include only on explicit request).
 
-## Industrials / Logistics
+### Public companies (raise in the equity market, not Reg D)
+Temu / PDD Holdings · and any company with an active exchange listing. Their capital events are S-1
+and 424B filings.
 
-### Logistics / Supply Chain
-Seeds: Flexport, Samsara, Project44, FourKites
+> For any of these, the honest line is: *"Out of scope — Form D covers independent US Regulation D
+> private placements only."*
 
-⚠️ **Excluded (do not use as seeds):**
-- *Convoy* — Shut down operations (Oct 2023). The identifier still resolves and historical rounds are available, but no new activity will appear.
+---
 
-### Robotics / Automation
-Seeds: Figure AI, Agility Robotics, Locus Robotics, Symbotic, Covariant
+## Public comparables (context only, never a rounds source)
 
-### Space / Aerospace
-Seeds: SpaceX, Relativity Space, Rocket Lab, Planet Labs, Astra
+`yfinance.screen()` with `Sector` / `Industry` gives the **public** cohort for a sector — useful for
+naming "who else is in this space" on the slide, and for sanity-checking a sector label.
 
-## Identifier Alias Reference
+```python
+import yfinance as yf
+from yfinance import EquityQuery
 
-Some well-known brand names don't match S&P Global's legal entity names. If a brand name returns empty results from `get_info_from_identifiers`, try the alias:
+res = yf.screen(EquityQuery("and", [
+    EquityQuery("eq", ["sector", "Technology"]),
+    EquityQuery("is-in", ["industry", "Software — Infrastructure"]),
+]))
+for q in res["quotes"]:
+    print(q["symbol"], q["shortName"], q.get("marketCap"))
+```
 
-| Brand Name | S&P Global Legal Name | company_id |
-|---|---|---|
-| Together AI | Together Computer, Inc. | C_1860042219 |
-| Character.ai | Character Technologies, Inc. | C_1829047235 |
-| Runway ML | Runway AI, Inc. | C_633706980 |
-| Adept AI | Adept AI Labs Inc. | C_1780739313 |
-| xAI | X.AI LLC | C_1863863313 |
+**Caveats that belong in the output, not just here:** yfinance scrapes an API Yahoo shut down in
+2017, has no stability guarantee, and is "personal use only" per its README. It is **not** a
+commercial path, and it contains **no private rounds at all**. If `yfinance` is unavailable, skip this
+step — it is optional context, never the data spine.
 
-> **Tip:** When a brand name fails, try `get_info_from_identifiers` with the legal name. If that also fails, the company may not be indexed yet. As a last resort, use the `company_id` directly as the identifier.
+---
 
 ## Notes
 
-- These lists skew toward US-based companies. For geographic filtering (Europe, Asia, etc.), the competitor expansion step is especially important.
-- For niche sub-sectors not listed here, ask the user for 2–3 example companies to use as seeds.
-- Always validate seeds are still active/relevant — companies pivot, merge, or shut down.
-- **Refresh cadence:** These seeds should be reviewed quarterly. AI sector seeds in particular change rapidly due to acquisitions and new entrants.
-- Seeds marked as subsidiaries or acquired will still resolve in `get_info_from_identifiers` (status = "Operating Subsidiary") but will return zero funding rounds. Skip these for funding queries.
+- **The sector is a filter, not a promise.** A narrow `q=` phrase will miss rounds whose filing never
+  uses the phrase. Say what the query covered; do not claim sector completeness.
+- **Coverage is US-only.** Sector rows above say nothing about non-US issuers in the same space.
+- **Refresh cadence:** review quarterly. Round-label vocabulary and which filings are noisy both
+  shift; so do the noisy-entity name patterns.
+- **Save every query URL you run.** They go in the slide footer verbatim, and a digest that cannot be
+  re-run is not auditable.

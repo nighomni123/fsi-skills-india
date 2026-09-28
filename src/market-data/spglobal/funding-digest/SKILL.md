@@ -1,10 +1,10 @@
 ---
 name: funding-digest
-description: "Generate a polished one-page PowerPoint slide summarizing key takeaways from recent funding rounds and notable capital markets activity across a user's watched sectors or companies. Use this skill when the user asks for a deal flow summary, weekly recap, funding digest, transaction roundup, or capital markets briefing. Triggers on: 'deal flow digest', 'weekly funding recap', 'deal roundup', 'transaction summary this week', 'what happened in [sector] this week', 'capital markets update', or any request to compile recent funding activity into a briefing slide. Produces a professional single-slide PPTX with key takeaways, valuation data, and Capital IQ deal links."
+description: "Build a one-slide funding digest — venture and startup roundup, deal flow recap, weekly capital-raises summary — sourced from SEC Form D filings via the EDGAR full-text search API (free, no key). COVERAGE LIMIT: Form D covers US Regulation D private placements only; it does NOT cover non-US rounds, late-stage rounds, or clean-tech project finance, and carries no investor-side or valuation data. Use when the user asks for a funding digest, venture roundup, startup raise summary, 'what raised money this week', or a capital-formation recap. Produces a single-slide PPTX with issuer, CIK, filing date, state, SIC, exemption type, and offering amount, built with officecli."
 ---
 
 **AI DISCLAIMER (MANDATORY):**
-You MUST include the following disclaimer text in the powerpoint footer. This is not optional — the report is incomplete without it:
+You MUST include the following disclaimer text in the PowerPoint footer. This is not optional — the report is incomplete without it:
 
 > **"Analysis is AI-generated — please confirm all outputs"**
 
@@ -12,503 +12,547 @@ You MUST include the following disclaimer text in the powerpoint footer. This is
 
 ---
 
-# Weekly Deal Flow Digest
+# Weekly Funding Digest
 
-Generate an analyst-quality **single-slide PowerPoint** that summarizes key takeaways from recent funding rounds across watched sectors or companies, using S&P Global Capital IQ data. Each deal links back to its Capital IQ profile for quick drill-down.
+Generate an analyst-quality **single-slide PowerPoint** summarizing what raised capital in a period,
+sourced from **SEC Form D filings via the EDGAR full-text search API** (free, no API key, no
+connector). Each row links back to the filing on EDGAR for drill-down.
+
+## Coverage — read this before anything else
+
+Form D is **not a global deal tape.** Say so on the slide, not just in your head. A reader who assumes
+this digest covers venture worldwide will draw the wrong conclusion from every number on it.
+
+| Form D **does** cover | Form D **does not** cover |
+|---|---|
+| US issuers raising under **Regulation D** private placement | **Non-US rounds** — UK, EU, India, China, LatAm are invisible here |
+| Issuer legal name, **CIK**, filing date (`file_date`) | **Late-stage / growth rounds** — large private rounds often use 506(c)+ and, more importantly, raise via structures that file elsewhere or not at all |
+| Business address and **state** (`biz_states`) | **Clean-tech / project finance** — SPVs file blind-pool 506(b) notices with no tranche detail |
+| **SIC code** (when the issuer supplied one) | **Valuation** — no pre-money, no post-money, no cap table, no share price |
+| **Exemption type** — `06b` (Rule 506(b)), `06c` (506(c) w/ general solicitation), `3C` (seed) | **Investor data** — no lead investor, no syndicate, no investor portfolio |
+| `Total Offering Amount`, `Total Amount Sold`, `Date of First Sale` (in the filing itself) | **Announced date** — a Form D is a *notice*, so a Jan 30 filing can carry a **Dec 19 date of first sale** |
+| Accession number → direct EDGAR document URL | **Round count for public companies** — IPOs are Form S-1, not Form D |
+
+Consequences you must honor:
+
+- **Never label the digest "global", "market-wide", or "VIE-free" without the qualifier.** Put
+  `US Regulation D private placements only` in the slide subtitle and footer.
+- **Valuation columns do not exist.** Drop pre-money, post-money, pricing trend, up/down round, and
+  lead investor. Substitute `Offering Amount`, `Amount Sold`, `Exemption`, `State`, `SIC`, `Accession`.
+  If a stat card would have been "Avg Pre-Money Valuation", use **Median Offering Amount** instead.
+- **If EDGAR returns nothing, the digest reports zero rounds.** Do not backfill from memory, from
+  news, or from "well-known deals last month." A wrong round is worse than a thin one — it looks
+  authoritative. See **Honesty rules** below.
+
+## Honesty rules (non-negotiable)
+
+1. **Never fabricate a round, an issuer, an amount, a date, a state, or an SIC code.** Every cell in
+   the table traces to a specific `adsh` accession number from an EDGAR response.
+2. **Zero results is a valid, reportable answer.** Say "0 US Reg D filings matched this query in this
+   window" and state the exact query. Absence of results is itself the finding.
+3. **Never name an investor.** Form D does not carry one. Related-person names on the filing are
+   officers/directors of the issuer, not investors.
+4. **Never call a `dateRange` filing date an announcement date.** Report `file_date` and, when you
+   have opened the filing, `Date of First Sale` — labelled as what they are.
+5. **Never guess the round type.** Round labels like "Series A" are usually inferred from the issuer's
+   *name* text, not a disclosed field. If the name does not say it, the cell reads `not stated`.
+6. **Cite the exact EDGAR query** in the footer, verbatim, including `q=`, `forms=D`, and the
+   `startdt`/`enddt` window — a digest that cannot be re-run is not auditable.
+7. **Never state a period-over-period comparison without re-running the shifted window.** Compute the
+   prior-period total from a real query, not by estimating.
 
 ## When to Use
 
 Trigger on any of these patterns:
-- "Give me a deal flow digest for this week"
-- "Weekly funding recap for [sector]"
-- "What deals closed in [sector/companies] recently?"
-- "Transaction roundup" or "deal roundup"
-- "Capital markets update for my coverage universe"
-- "Summarize recent funding activity"
-- Any periodic briefing request about deals, raises, or rounds
+- "Give me a funding digest for this week"
+- "Weekly venture roundup for [sector]"
+- "What startups raised in [sector] recently?"
+- "Capital formation recap" or "deal roundup"
+- "Summarize recent US private placements"
+- Any periodic briefing request about raises, offerings, or private placements
+
+Trigger **with a caveat prompt** when the user asks for a non-US, late-stage, or clean-tech-only
+digest — say up front that Form D will not cover it, and offer the US Reg D digest instead.
 
 ## Nested Skills
 
 This skill produces a one-slide PPTX briefing:
-- **Read** `/mnt/skills/public/pptx/SKILL.md` before generating the PowerPoint (and its sub-reference `pptxgenjs.md` for creating from scratch)
+- **Read** `pptx-author` (the FSI layer) and `officecli-pptx` (the full element vocabulary) before
+  building. The deck is a **file on disk** built with the `officecli` CLI — not a pptxgenjs script.
+- For the free-source stack generally, load `market-data-sources`.
 
-## Entity Resolution & Tool Robustness
+## Querying EDGAR Robustly
 
-S&P Global's identifier system resolves company names to legal entities. This works well for most companies but has known failure modes that cause empty results. **Apply these rules throughout the workflow to avoid silent data loss.**
+EDGAR's full-text search is a real API with real failure modes. **Apply these rules throughout** to
+avoid silent data loss.
 
-### Rule 0: Pre-validate ALL identifiers before querying funding
+### The endpoint
 
-**Before** calling any funding tools, run every identifier through `get_info_from_identifiers`. This is the cheapest and most reliable way to catch problems early. Check two things in the response:
+```
+https://efts.sec.gov/LATEST/search-index?q=%22Series+A%22&forms=D&dateRange=custom&startdt=2026-01-01&enddt=2026-02-01
+```
 
-1. **Did it resolve at all?** If the identifier returns empty/error, the name doesn't exist in S&P Global. Try the alias from `references/sector-seeds.md`, the legal entity name, or the `company_id` directly.
-2. **What is the `status` field?** 
-   - `"Operating"` → Safe to query for funding rounds.
-   - `"Operating Subsidiary"` → The company exists but is owned by a parent. It will return **zero funding rounds**. Note this in the digest as context (e.g., "acquired by [Parent]") but do not query for funding.
-   - Any other status (e.g., closed, inactive) → The company is no longer operating. Historical data may exist but no new activity.
+| Parameter | Value | Why |
+|---|---|---|
+| `q=` | URL-encoded phrase, quotes for exact match | The search term. `"Series A"` is a phrase; `Series A` is two loose tokens. |
+| `forms=D` | required | Restricts to Form D. Without it you get 8-K, S-1, and D mixed. |
+| `dateRange=custom` | required with the next two | EDGAR otherwise only offers coarse presets. |
+| `startdt` / `enddt` | `YYYY-MM-DD` | The digest window. **Inclusive** on both ends — `enddt=2026-02-01` includes Feb 1. |
+| `from=` / `size=` | `0` / up to `10000` | The response echoes `from=0&size=100`; page through long windows. |
+| `ciks=` | zero-padded CIK | Narrow to one issuer when you already know it. |
 
-**This single pre-validation step prevents the majority of empty-result issues.** Batch all candidates into a single `get_info_from_identifiers` call (it handles large batches well) and triage before proceeding.
+> **No API key, no connector, no header required for this endpoint** — unlike `data.sec.gov`, which
+> *does* require a `User-Agent`. The Form D filing documents you fetch from `www.sec.gov` are best
+> requested with one anyway: `-H 'User-Agent: Your Name your@email.com'`.
 
-### Rule 1: Never trust empty results without a fallback
+**Verified live.** `q="Series A"`, `2026-01-01`→`2026-02-01` returned **106** Form D filings.
+`q="Series B"`, `2026-08-01`→`2026-09-28` returned **21**.
 
-If `get_rounds_of_funding_from_identifiers` returns empty for a company you expect to have data:
-1. **Try the legal entity name or company_id.** Brand names usually work, but some don't. See the alias table in `references/sector-seeds.md` for known mismatches. Common pattern: "[Brand] AI" → "[Legal Name], Inc." (e.g., Together AI → "Together Computer, Inc.", Character.ai → "Character Technologies, Inc.", Runway ML → "Runway AI, Inc.").
-2. **Verify the company exists in S&P.** If you skipped Rule 0, call `get_info_from_identifiers(identifiers=["Company"])` now — if this also returns empty, the company may be too early-stage or not yet indexed.
+### Rule 0: the hit does not contain the money
 
-### Rule 2: Subsidiaries have no funding rounds
+Each hit's `_source` carries: `ciks`, `display_names`, `file_date`, `biz_states`, `biz_locations`,
+`inc_states`, `sics`, `form`, `adsh`, `file_num`, `film_num`, `items`, `schema_version`, `root_forms`.
 
-Companies that are divisions or wholly-owned subsidiaries of larger companies (e.g., DeepMind under Alphabet, GitHub under Microsoft, BeReal under Voodoo) will return **zero funding rounds**. Their capital events are tracked at the parent level.
+**There is no offering amount in the search response.** To get dollars you must open the filing
+itself (Rule 2). Any "total raised" figure built from search hits alone is fabricated.
 
-**How to detect:** The `status` field from `get_info_from_identifiers` will show `"Operating Subsidiary"`. The `references/sector-seeds.md` file also flags known subsidiaries with ⚠️ warnings. Skip these for funding queries.
+### Rule 1: `q=` results are noisy — filter before you count
 
-### Rule 3: Use `get_rounds_of_funding_from_identifiers` as the primary tool, not `get_funding_summary_from_identifiers`
+The 106-hit January query returned overwhelmingly **REIT and fund blind-pool SPVs** (`SSC Alight …`,
+`AREG US Fund XI REIT …`, `Whale Rock MegaCap Tech Fund`) — real filings, but not venture startups.
+`q="Series A"` matches a filing because the *phrase* appears in the document, not because it is a
+Series A round.
 
-The summary tool is faster but less reliable — it can return errors or incomplete data even when detailed rounds exist. Always use the detailed rounds tool as the primary data source. The summary tool is acceptable only for quick aggregate checks (total raised, round count) and should be verified against the rounds tool if results seem low.
+So: **do not report `hits.total` as "number of Series A rounds."** Report the count *after* filtering.
+Drop entities whose name contains `REIT`, `Fund`, `L.P.`, `LLC - Series`, `Co-Invest`, `Blind Pool`,
+`Statutory Trust`, or whose SIC is a real-estate code. Count what survives, and say what you dropped.
 
-### Rule 4: Batch carefully and validate
+### Rule 2: the dollar amount lives in the filing document
 
-When processing large company universes (50+ companies), batch in groups of 15–20. After each batch, check for companies that returned empty results and run them through the fallback steps in Rule 1 before moving on.
+Build the document URL from the hit — CIK without leading zeros, accession without dashes:
 
-### Rule 5: The `role` parameter is critical
+```
+https://www.sec.gov/Archives/edgar/data/1350102/000107997326000147/xslFormDX01/primary_doc.xml
+```
 
-- `company_raising_funds` → "What rounds did X raise?" (company perspective)
-- `company_investing_in_round_of_funding` → "What did investor Y invest in?" (investor perspective)
+The `xslFormDX01/` segment renders the raw XML as a readable Form D. The rendered document is
+sectioned, and section **"13. Offering and Sales Amounts"** carries:
 
-Using the wrong role returns empty results silently. For deal flow digests, you almost always want `company_raising_funds`. Only use the investor role when specifically analyzing an investor's portfolio activity.
+| Label in the document | Becomes |
+|---|---|
+| `Total Offering Amount` | the headline size (verified live: `$10,000,000 USD`) |
+| `Total Amount Sold` | progress against the target |
+| `Total Remaining to be Sold` | what is still open |
+| `Date of First Sale` | the actual raise date — often **earlier** than the filing date |
+| `Minimum Investment` | ticket size |
+| `Industry Group` | issuer's self-declared sector |
+| `Revenue Range` | size band |
 
-### Rule 6: Identifier resolution is case-insensitive but spelling-sensitive
+Drop the `xslFormDX01/` segment and you get the raw `primary_doc.xml`, which is valid but harder to
+parse. Use the rendered form.
 
-S&P Global handles case variations ("openai" = "OpenAI") but is strict on spelling and punctuation. "Character AI" may fail where "Character.ai" succeeds. When in doubt, use the `company_id` (e.g., `C_1829047235`) which is guaranteed to resolve.
+### Rule 3: SIC is mostly empty — do not build the sector screen on it
+
+In the 106-hit January query, only **2** filings carried a SIC code (`3674`, `5200`); the rest returned
+`sics: []`. SIC is optional on Form D. Classify by name and `Industry Group` from the filing, and use
+SIC only as a tiebreak.
+
+### Rule 4: `Date of First Sale` ≠ `file_date` — label both
+
+A filing dated `2026-01-30` may show `Date of First Sale 2025-12-19`. The digest's "period" is the
+**filing window**, so a round can appear in a period it did not close in. State the rule in the
+footnote: *"Period = EDGAR filing date window; date of first sale is the issuer-reported raise date."*
+
+### Rule 5: an empty response is a result, not a bug
+
+If `hits.total` is 0 — or every hit is filtered out by Rule 1 — the digest reports **zero rounds**
+with the exact query cited. Do not broaden `q=` to unrelated terms to manufacture volume, and do not
+fill the table from prior knowledge of the sector. A narrow, correct, empty digest beats a padded one.
+
+### Rule 6: round labels are inferred, not disclosed
+
+Form D has **no round-type field**. "Series A" is inferred from the issuer's *name* text when it says
+`X - Series A`, or from `Industry Group` = `Venture Capital Fund`. When neither supports a label, the
+cell reads `not stated` — do not guess a stage from the dollar amount.
 
 ## Workflow
 
 ### Step 1: Establish Coverage & Period
 
-Determine what the digest should cover. There are two setups:
-
-**Returning user (has a watchlist):**
-If the user has previously defined sectors or companies to track, use that list. Check conversation history for prior watchlists.
-
-**New user:**
-Ask for:
-
 | Parameter | Default | Notes |
-|-----------|---------|-------|
-| **Sectors** | *(at least one)* | e.g., "AI, Fintech, Biotech" |
-| **Specific companies** | Optional | Supplement sector-level coverage |
+|---|---|---|
+| **Sectors** | *(at least one)* | e.g. "biotech, fintech, devtools" |
+| **Specific issuers** | Optional | By legal name or CIK |
 | **Time period** | Last 7 days | "This week", "last 2 weeks", "this month" |
 
-Calculate the exact `start_date` and `end_date` from the time period.
+Compute exact `startdt` / `enddt`. State the US-Form-D-only limitation to the user **before**
+building if their request implies global or late-stage coverage.
 
-### Step 2: Build the Company Universe
+### Step 2: Build the Issuer Universe
 
-For each sector specified, build a company universe using a validated bootstrapping approach:
+The old model — seed companies, then expand through a competitor graph — becomes a **query-term**
+model. Form D is issuer-driven, so you search the *filing corpus*, not a company list.
 
-1. **Seed companies** from domain knowledge (see `references/sector-seeds.md`)
-   - Pay attention to the ⚠️ warnings and alias notes in the seeds file — some well-known companies are subsidiaries, have been acquired, or require a specific legal name to resolve.
-   - The seeds file includes `company_id` values for known alias mismatches. Use these directly if the brand name fails.
+1. **Sector seeds → query terms.** `references/sector-seeds.md` maps each sector to (a) round-label
+   phrases to put in `q=`, (b) industry keywords for a second pass, and (c) SIC codes for tiebreaks.
+2. **Optional public-comparable pass.** `yfinance.screen()` with `Sector` / `Industry` gives the
+   public cohort for a sector — useful for sanity-checking a sector label and for the digest's
+   "who else is in this space" line. It is **not** a source of private rounds, and yfinance is
+   scraper-backed and personal-use only. Treat it as context, never as a rounds source.
+3. **Known-issuer checks.** If the user names a company, search its legal name / CIK directly and
+   report honestly if it never filed (a US company may be non-US, or may have raised without Reg D).
 
-2. **Pre-validate all seeds immediately** (Rule 0):
-   ```
-   get_info_from_identifiers(identifiers=[all_seeds_for_this_sector])
-   ```
-   Triage the results into two buckets:
-   - ✅ **Resolved & Operating** (`status` = "Operating") → proceed to competitor expansion
-   - ❌ **Unresolved or Subsidiary** → retry with alias/legal name from seeds file; subsidiaries are noted for context but excluded from funding queries
+Keep the universe honest: the sector is a *filter on filings*, not a promise of coverage.
 
-3. **Expand via competitors** (using only the ✅ resolved seeds):
-   ```
-   get_competitors_from_identifiers(identifiers=[resolved_seeds], competitor_source="all")
-   ```
+### Step 3: Run the Form D Query
 
-4. **Validate expanded universe:**
-   ```
-   get_info_from_identifiers(identifiers=[new_competitors])
-   ```
-   Apply the same triage. Filter by `simple_industry` matching the target sector. Drop any unresolved names or subsidiaries.
-
-If the user provides specific companies, add those directly but still run them through the pre-validation triage. Never skip validation — even well-known brand names can fail silently.
-
-Keep the universe manageable — aim for 15–40 **resolved, operating** companies per sector. For a multi-sector digest, this might total 50–100+ companies.
-
-### Step 3: Pull Funding Rounds
-
-For all companies in the universe:
-
-```
-get_rounds_of_funding_from_identifiers(
-    identifiers=[batch],
-    role="company_raising_funds",
-    start_date="YYYY-MM-DD",
-    end_date="YYYY-MM-DD"
-)
+```bash
+curl -s 'https://efts.sec.gov/LATEST/search-index?q=%22Series+A%22&forms=D&dateRange=custom&startdt=2026-01-01&enddt=2026-02-01'
 ```
 
-Process in batches of 15–20 if the universe is large.
+- URL-encode the `q=` phrase; spaces become `+`, quotes become `%22`.
+- Page with `from=` / `size=` when `hits.total` exceeds the page.
+- Collect per hit: `display_names[0]`, `ciks[0]`, `adsh`, `file_date`, `biz_states`, `sics`, `items`.
+- Apply the Rule 1 noise filter **before** any count or total.
+- Save the exact URL string — it goes in the slide footer.
 
-**After each batch, identify companies with empty results.** For any company expected to have activity:
-1. Retry with the legal entity name or alternate identifier (see Entity Resolution rules above).
-2. Log the company as "no data" only after exhausting fallbacks.
+`items` maps to the exemption codes: `06b` = Rule 506(b) (no general solicitation), `06c` = Rule
+506(c) (general solicitation allowed), `3C` = Rule 3C (seed / no more than 35 non-accredited, $5M cap).
 
-Collect all `transaction_id` values from successful results, then enrich with detailed round info:
+### Step 4: Enrich the Shortlist With Amounts
 
-```
-get_rounds_of_funding_info_from_transaction_ids(
-    transaction_ids=[all_funding_ids]
-)
-```
-
-Pass ALL transaction IDs in a single call (or small number of calls) rather than one per transaction — the tool handles batches efficiently.
-
-**Extract the following from each round (critical for the slide):**
-- `transaction_id` — needed for the Capital IQ deal link
-- **Announcement date** — when the round was publicly announced
-- **Close date** — when the round officially closed
-- Amount raised
-- **Pre-money valuation** (if disclosed)
-- **Post-money valuation** (if disclosed)
-- Lead investors
-- Round type (Series A, B, C, etc.)
-- Security terms
-- Advisors
-- Pricing trend (up-round / down-round / flat)
-
-> **Dates are required.** The announcement and close dates must always appear in the final slide's deal table. If only one date is available, show it and mark the other as "—".
-
-### Step 4: Pull Company Context for Notable Deals
-
-For any company involved in a significant deal (large round, notable valuation shift), get a brief description:
+For the 6–10 filings that survive the filter and matter:
 
 ```
-get_company_summary_from_identifiers(identifiers=[notable_companies])
+https://www.sec.gov/Archives/edgar/data/<cik>/<adsh-no-dashes>/xslFormDX01/primary_doc.xml
 ```
 
-This adds context to the narrative (e.g., "The company, an AI infrastructure startup founded in 2021, is expanding into...").
+Extract `Total Offering Amount`, `Total Amount Sold`, `Date of First Sale`, `Industry Group`. If the
+filing says **"Decline to Disclose"**, the amount cell is `declined to disclose` — a real and
+frequent answer, and a legitimate reason for the "no amount" outcome. Never estimate it.
 
 ### Step 5: Identify Highlights & Trends
 
-Before designing the slide, analyze the data to surface the story:
+**Round-size buckets** (a *heuristic on the offering amount*, labelled as such):
+
+| Bucket | Offering amount | Typical label |
+|---|---|---|
+| 1 | < $5M | Seed / 3C |
+| 2 | $5M – $25M | Series A |
+| 3 | $25M – $100M | Series B |
+| 4 | $100M – $250M | Series C |
+| 5 | > $250M | Large / late |
+
+A filing can sit in a bucket while its name says otherwise — when both are available, show both
+(`Series A (name) · $84M (bucket 3)`). Where the name is silent, show only the bucket.
 
 **Flag as "Notable":**
-- Rounds ≥ $100M
-- Down rounds (pricing trend = down)
-- New unicorns (post-money valuation crossing $1B)
-- Significant valuation jumps (post-money ≥ 2x the last known valuation)
-- Repeat raisers (same company raising again within 6 months)
-- Unusually large investor syndicates
+- Offering ≥ $100M
+- A repeat filer — same CIK, more than one Form D inside the window or across the prior window
+- A `06c` filer (general solicitation permitted) at scale — signals a different distribution channel
+- Issuer with `Venture Capital Fund` industry group
+- An amount or state that is an outlier vs. the digest median
 
-**Identify Trends:**
-- Total capital deployed this period vs. typical (if historical data available)
-- Which sub-sectors are hottest (most rounds, most capital)
-- Round stage distribution (is early-stage or late-stage dominating?)
-- Most active investors across the digest
-- Geographic concentration
-- Valuation trends (are pre-money valuations compressing or expanding?)
+**Period-over-period:** re-run the **identical query** with the window shifted back by its own length
+(e.g. `startdt=2025-12-01&enddt=2026-01-01` against a January window), apply the same filter, and
+compare count and total offered. Both windows get cited in the footer. If the prior window cannot be
+run, say "no prior-period comparison" rather than implying one.
 
-**Select Key Takeaways (3–5):**
-Distill the most important signals into 3–5 concise bullet-style takeaways. These are the centerpiece of the slide. Each takeaway should be one sentence, punchy, and data-backed.
-
-Examples:
-- "AI sector raised $2.4B across 8 rounds — 3x the prior week, led by a $800M mega-round from [Company] at a $12B post-money valuation."
-- "[Company] closed a $200M Series D at $3.5B pre-money, up from $1.8B in its Series C — signaling strong demand for AI developer tools."
-- "Down-round activity ticked up: 2 of 6 late-stage rounds priced below prior valuations."
+**Key Takeaways (3–5):** one sentence each, punchy, every number traceable. Examples of the right
+register:
+- "23 US Reg D filings matched this window, offering $412M in aggregate — down from $538M in the
+  prior 31 days on the same query."
+- "Largest offering: AC Holdings I LP, $10.0M under Rule 506(b), filed Jan 30 (first sale Dec 19)."
+- "Filings concentrated in CO and NY; no 506(c) filers above $25M this window."
 
 ### Step 6: Generate Company Logos
 
-For each company featured in the key takeaways or notable deals, generate a logo using a two-tier local pipeline. **Do not use Clearbit** (`logo.clearbit.com`) — it is deprecated and consistently fails. External logo CDNs (Brandfetch, logo.dev, Google Favicons) require API keys or are blocked by network restrictions. Instead, use the following approach:
+**Do not use Clearbit** (`logo.clearbit.com`) — deprecated and consistently fails. Brandfetch, logo.dev
+and Google Favicons need keys or are network-blocked. Use the two-tier local pipeline instead.
 
-#### Tier 1: `simple-icons` npm Package (3,300+ Brand SVGs, No Network Required)
-
-The `simple-icons` package bundles high-quality SVG icons for thousands of well-known brands. It works entirely offline — no API keys, no network calls. Install it alongside `sharp` for SVG → PNG conversion:
+**Tier 1 — `simple-icons` (3,300+ brand SVGs, fully offline):**
 
 ```bash
 npm install simple-icons sharp
 ```
 
-**Lookup strategy:**
-
 ```javascript
 const si = require('simple-icons');
 const sharp = require('sharp');
 
-// Find an icon by exact title match (case-insensitive)
 function findSimpleIcon(companyName) {
-    // Try exact match first
+  for (const [key, val] of Object.entries(si)) {
+    if (!key.startsWith('si') || !val || !val.title) continue;
+    if (val.title.toLowerCase() === companyName.toLowerCase()) return val;
+  }
+  const stripped = companyName.replace(/\s*(AI|Inc\.?|Corp\.?|Ltd\.?|LLC|L\.P\.?)$/i, '').trim();
+  if (stripped !== companyName) {
     for (const [key, val] of Object.entries(si)) {
-        if (!key.startsWith('si') || !val || !val.title) continue;
-        if (val.title.toLowerCase() === companyName.toLowerCase()) return val;
+      if (!key.startsWith('si') || !val || !val.title) continue;
+      if (val.title.toLowerCase() === stripped.toLowerCase()) return val;
     }
-    // Try without common suffixes (AI, Inc., Corp.)
-    const stripped = companyName.replace(/\s*(AI|Inc\.?|Corp\.?|Ltd\.?)$/i, '').trim();
-    if (stripped !== companyName) {
-        for (const [key, val] of Object.entries(si)) {
-            if (!key.startsWith('si') || !val || !val.title) continue;
-            if (val.title.toLowerCase() === stripped.toLowerCase()) return val;
-        }
-    }
-    return null;
+  }
+  return null;
 }
 
-// Convert SVG to PNG with the brand's official color
 async function simpleIconToPng(icon, outputPath) {
-    const coloredSvg = icon.svg.replace('<svg', `<svg fill="#${icon.hex}"`);
-    await sharp(Buffer.from(coloredSvg))
-        .resize(128, 128, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
-        .png()
-        .toFile(outputPath);
+  const coloredSvg = icon.svg.replace('<svg', `<svg fill="#${icon.hex}"`);
+  await sharp(Buffer.from(coloredSvg))
+    .resize(128, 128, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+    .png()
+    .toFile(outputPath);
 }
 ```
 
-**Coverage:** ~43% of typical deal flow companies (strong for major tech brands like Stripe, Anthropic, Databricks, Snowflake, Discord, Shopify, SpaceX, Mistral AI, Hugging Face; weaker for niche fintech, biotech, or early-stage companies).
+**Coverage:** strong for large recognizable brands; weak for the long tail of early-stage issuers and
+fund SPVs — which is exactly who shows up in Form D. Expect a low hit rate and plan the fallback.
 
-#### Tier 2: Initial-Based Fallback via `sharp` (100% Coverage)
-
-For companies not found in `simple-icons`, generate a clean initial-based logo as a PNG:
+**Tier 2 — initial fallback via `sharp` (100% coverage):**
 
 ```javascript
 async function generateInitialLogo(companyName, outputPath) {
-    const initial = companyName.charAt(0).toUpperCase();
-    const svg = `
-    <svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="64" cy="64" r="64" fill="#BDBDBD"/>
-        <text x="64" y="64" font-family="Arial, Helvetica, sans-serif"
-              font-size="56" font-weight="bold" fill="#FFFFFF"
-              text-anchor="middle" dominant-baseline="central">${initial}</text>
-    </svg>`;
-    await sharp(Buffer.from(svg)).png().toFile(outputPath);
+  const initial = companyName.replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase() || '?';
+  const svg = `
+  <svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#BDBDBD"/>
+      <text x="64" y="64" font-family="Arial, Helvetica, sans-serif"
+            font-size="56" font-weight="bold" fill="#FFFFFF"
+            text-anchor="middle" dominant-baseline="central">${initial}</text>
+  </svg>`;
+  await sharp(Buffer.from(svg)).png().toFile(outputPath);
 }
 ```
 
-#### Complete Pipeline
+**Pipeline** (unchanged in shape from the original skill):
 
 ```javascript
 async function fetchLogo(companyName, outputDir) {
-    const fileName = companyName.toLowerCase().replace(/[\s.]+/g, '-') + '.png';
-    const outPath = path.join(outputDir, fileName);
-
-    // Tier 1: Try simple-icons
-    const icon = findSimpleIcon(companyName);
-    if (icon) {
-        await simpleIconToPng(icon, outPath);
-        return { path: outPath, source: 'simple-icons' };
-    }
-
-    // Tier 2: Generate initial-based fallback
-    await generateInitialLogo(companyName, outPath);
-    return { path: outPath, source: 'initial-fallback' };
+  const fileName = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';
+  const outPath = path.join(outputDir, fileName);
+  const icon = findSimpleIcon(companyName);
+  if (icon) {
+    await simpleIconToPng(icon, outPath);
+    return { path: outPath, source: 'simple-icons' };
+  }
+  await generateInitialLogo(companyName, outPath);
+  return { path: outPath, source: 'initial-fallback' };
 }
 ```
 
 **Logo guidelines:**
-- Save all logos to `/home/claude/logos/[company-name].png`
-- All logos are 128×128 PNG with transparent backgrounds
-- On the slide, display logos at 0.35"–0.5" tall — they're accents, not focal points
-- Initial-fallback circles use gray (`BDBDBD`) fill with white text — consistent with the monochrome palette
-- Never mix logo styles randomly — if most companies resolve to brand icons, the few fallbacks should blend in naturally
+- Save to `out/logos/<company>.png` — 128×128 PNG, transparent background
+- On the slide, 0.9–1.2cm tall — accents, not focal points
+- Initial fallbacks are gray `BDBDBD` with white text
+- If both packages fail, use a pptx ellipse shape + text overlay (zero dependencies)
 
-### Step 7: Generate the One-Page PPTX
+### Step 7: Build the One-Page PPTX (officecli)
 
-Read `/mnt/skills/public/pptx/SKILL.md` and `/mnt/skills/public/pptx/pptxgenjs.md` before creating the slide.
+Build the deck as a **file artifact** with the `officecli` CLI. Every command below was run against
+`officecli 1.0.152`.
 
-Create a **single-slide** PowerPoint using `pptxgenjs`. The slide should be information-dense but visually clean — think "executive dashboard" not "wall of text."
+```bash
+mkdir -p out
+officecli create out/funding-digest.pptx --force
+officecli batch out/funding-digest.pptx --commands "$(cat batch.json)"
+officecli close out/funding-digest.pptx
+```
 
-#### Slide Layout
+`batch` is the workhorse and it is **atomic** — one bad item rolls the whole array back and names the
+failing index. Build the array in a file, not an inline string, so it stays re-runnable.
+
+```json
+[
+ {"command":"add","parent":"/","type":"slide",
+  "props":{"title":"US Reg D private placements, Jan 2026","layout":"Blank"}},
+ {"command":"add","parent":"/slide[1]","type":"shape",
+  "props":{"text":"FUNDING DIGEST","x":"0cm","y":"0cm","w":"25.4cm","h":"1.4cm",
+           "fill":"1A1A1A","color":"FFFFFF","size":24,"font.bold":true}},
+ {"command":"add","parent":"/slide[1]","type":"shape",
+  "props":{"text":"$412M","x":"0.6cm","y":"1.8cm","w":"5.5cm","h":"2.0cm",
+           "color":"1A1A1A","size":36,"font.bold":true,"fill":"F5F5F5"}},
+ {"command":"add","parent":"/slide[1]","type":"table",
+  "props":{"rows":5,"cols":7,"x":"0.6cm","y":"6.0cm","w":"24.2cm",
+           "colWidths":"4.6cm,2.6cm,1.8cm,1.6cm,2.2cm,1.6cm,3.4cm",
+           "headerFill":"1A1A1A","bodyFill":"F5F5F5","border.all":"1pt solid D0D0D0"}},
+ {"command":"add","parent":"/slide[1]","type":"shape",
+  "props":{"text":"Footer: US Reg D only · source: SEC EDGAR Form D · Generated 2026-09-28",
+           "x":"0cm","y":"18.0cm","w":"25.4cm","h":"0.8cm","color":"6B6B6B","size":8}}
+]
+```
+
+Then cell content, a logo, and the filing links:
+
+```bash
+officecli set out/funding-digest.pptx /slide[1]/table[1]/tr[1]/tc[1] --prop text="Issuer" \
+  --prop size=10pt --prop color=FFFFFF
+officecli set out/funding-digest.pptx /slide[1]/table[1]/tr[2]/tc[2] --prop text="Series A" --prop size=9pt
+
+officecli add out/funding-digest.pptx /slide[1] --type picture \
+  --prop src=out/logos/acme.png --prop x=0.6cm --prop y=3.9cm --prop width=0.9cm
+
+officecli add out/funding-digest.pptx /slide[1] --type shape \
+  --prop text="EDGAR 0001079973-26-000147" --prop x=0.6cm --prop y=13.2cm \
+  --prop w=9cm --prop h=0.6cm --prop color=2B5797 --prop size=9
+# → "Added shape at /slide[1]/shape[@id=100006]"  ← target THIS path next
+
+officecli add out/funding-digest.pptx '/slide[1]/shape[@id=100006]' --type hyperlink \
+  --prop link="https://www.sec.gov/Archives/edgar/data/1350102/000107997326000147/xslFormDX01/primary_doc.xml"
+```
+
+**Table cells cannot hold a hyperlink.** `tc` accepts only
+`text, bold, italic, underline, color, fill, size, font, align, valign, border, colspan, rowspan, margin`
+— `link` is rejected, and a run-level `link` on `tc/p/r` is unsupported too. So the "Deal Link"
+column becomes **the accession number as text** (`0001079973-26-000147`), with one or two **linked
+shapes** beneath the table carrying the real URL. Do not fake a clickable cell.
+
+#### Slide layout
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  DEAL FLOW DIGEST                                           │
-│  [Period] · [Sectors]                           [Date]      │
+│  FUNDING DIGEST                              [as of date]   │
+│  [Period] · [Sectors] · US Reg D private placements only    │
 ├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
-│  │  $X.XB  │  │  N      │  │  $X.XB  │  │  $X.XB  │       │
-│  │ Raised  │  │ Rounds  │  │ Avg Pre │  │ Largest │       │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐         │
+│  │ $412M   │  │  23     │  │ $8.1M   │  │ $96M    │         │
+│  │ Offered │  │ Filings │  │ Median  │  │ Largest │         │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘         │
 │                                                             │
 │  KEY TAKEAWAYS                                              │
-│  ─────────────────────────────────────────────────          │
-│  [Logo] Takeaway 1 text goes here...                        │
-│  [Logo] Takeaway 2 text goes here...                        │
-│  [Logo] Takeaway 3 text goes here...                        │
-│  [Logo] Takeaway 4 text goes here...                        │
+│  [Logo] Takeaway 1 …                                        │
+│  [Logo] Takeaway 2 …                                        │
 │                                                             │
-│  TOP DEALS                                                  │
-│  ┌──────────────────────────────────────────────────────────┐│
-│  │Company│Type │Announced│Closed│Amount│Pre-$│Post-$│Lead│🔗││
-│  │───────│─────│─────────│──────│──────│─────│──────│────│──││
-│  │ ...   │ ... │  ...    │ ...  │ ...  │ ... │ ...  │... │🔗││
-│  └──────────────────────────────────────────────────────────┘│
-│                                                             │
-│  [Footer: Deal Flow Digest · Sources: S&P Global Capital IQ]│
-│  [Footer: AI Disclaimer]                                    │
+│  TOP FILINGS                                                │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │Issuer (CIK)│Round │Filed │First Sale│Offering│St │Acc#│ │
+│  └──────────────────────────────────────────────────────┘  │
+│  EDGAR 0001079973-26-000147  ↗                              │
+│  [Footer: source + exact query + AI disclaimer]             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### Design Specifications
+#### Design specifications
 
-**Color philosophy: Minimal, monochrome-first.** The slide should feel like a high-end financial brief — black, white, and gray dominate. Color is used **only** where it carries meaning (e.g., a red indicator for a down round, a green indicator for a standout metric) or where the reader would naturally expect it (company logos). Never use color for purely decorative purposes like background fills, accent bars, or gradient effects.
+**Color philosophy: minimal, monochrome-first.** Color only where it carries meaning.
 
-**Color palette — Monochrome Executive:**
-- Primary background: `FFFFFF` (white) — clean, open slide background
-- Header bar: `1A1A1A` (near-black) — strong contrast for the title region
-- Primary text: `1A1A1A` (near-black) — all body text, stat numbers, takeaways
-- Secondary text: `6B6B6B` (medium gray) — labels, captions, footer, date stamps
-- Borders & dividers: `D0D0D0` (light gray) — subtle structural lines, card outlines, table borders
-- Card backgrounds: `F5F5F5` (off-white / very light gray) — stat card fills, alternating table rows
-- Link text: `2B5797` (muted blue) — Capital IQ deal links in the table (the only blue on the slide)
-- **Semantic color (sparingly):**
-  - Down rounds or negative signals: `C0392B` (muted red) — use only as a small dot, tag, or single-word highlight, never as a fill or background
-  - Standout positive metrics (new unicorn, outsized round): `2E7D32` (muted green) — same minimal usage: a dot, a small tag, or a single highlighted number
-  - If no data points warrant a color indicator, **use no color at all**. A fully monochrome slide is perfectly correct.
+| Role | Hex |
+|---|---|
+| Background | `FFFFFF` |
+| Header bar | `1A1A1A` |
+| Primary text | `1A1A1A` |
+| Secondary text / labels / footer | `6B6B6B` |
+| Borders, dividers, table grid | `D0D0D0` |
+| Card and alternating row fill | `F5F5F5` |
+| EDGAR links (the only blue) | `2B5797` |
+| Negative / attention signal (sparingly) | `C0392B` |
+| Standout positive (sparingly) | `2E7D32` |
 
-**Typography:**
-- Title: 28–32pt, bold, white on near-black header bar
-- Stat numbers: 36–44pt, bold, near-black
-- Stat labels: 10–12pt, medium gray (`6B6B6B`)
-- Takeaway text: 12–14pt, near-black, left-aligned
-- Table text: 9–11pt, near-black with gray (`6B6B6B`) for secondary columns
-- Link text: 9–10pt, muted blue (`2B5797`)
-- Footer: 8pt, medium gray
+If nothing warrants a signal, **use no color at all.** A fully monochrome slide is correct.
 
-**Stat Cards (top row):**
-- 4 key metrics as large-number callouts: Total Raised, # Rounds, Avg Pre-Money Valuation, Largest Round
-- Each in a card with `F5F5F5` fill and a thin `D0D0D0` border — no shadow, no color fills
-- If a stat is surprising or extreme (e.g., 3x normal volume, a record deal), a small colored dot or underline may be placed next to that single number — otherwise keep fully monochrome
-- If pre-money valuations are mostly undisclosed, substitute with a different metric (e.g., Median Round Size, # New Unicorns)
+**Typography:** title 24–28pt bold white on near-black · stat numbers 32–40pt bold · stat labels
+10–12pt gray · takeaways 12–14pt · table text 9–10pt · footer 8pt gray.
 
-**Key Takeaways (middle section):**
-- 3–5 one-line takeaways, each prefixed with the relevant company logo (small, ~0.35" tall)
-- If no logo available, use a **gray circle** with the company initial in white — not a colored circle
-- Left-aligned, with enough spacing to breathe
-- Down-round or negative takeaways may use a small red dot prefix; otherwise no color
-- Include valuation context where available (e.g., "at a $5B post-money valuation")
+**Stat cards (top row) — 4 metrics.** With no valuation data available, use:
+1. **Total Offered** (sum of disclosed `Total Offering Amount` — count "declined to disclose" filings separately)
+2. **# Filings** (after the Rule 1 noise filter)
+3. **Median Offering** (of the disclosed set)
+4. **Largest Offering**
 
-**Top Deals Table (bottom section):**
-- Compact table showing the 4–6 most notable deals
-- Columns: Company, Type (Series X), Announced (date), Closed (date), Amount ($M), Pre-Money ($M), Post-Money ($M), Lead Investor, Deal Link
-- **Announced** and **Closed** columns show dates in `MMM DD` format (e.g., "Jan 15"). These columns are required and must always be present. If a date is not available, show "—".
-- The **Deal Link** column contains a clickable "View →" text linking to Capital IQ:
-  ```
-  https://www.capitaliq.spglobal.com/web/client?#offering/capitalOfferingProfile?id=<transaction_id>
-  ```
-  where `<transaction_id>` is the `transaction_id` from `get_rounds_of_funding_from_identifiers`.
-- If pre-money or post-money valuation is not disclosed, show "—" in that cell
-- Header row with near-black (`1A1A1A`) fill and white text; alternating rows in `F5F5F5` and `FFFFFF`
-- **Center the table horizontally** on the slide. Calculate the table's total width, then set `x` so it is centered within the slide width: `x = (slideWidth - tableWidth) / 2`. For a 16:9 layout (13.33" wide), if the table is 12" wide, use `x = 0.67`. Never left-align the table to the slide edge.
-- Keep it tight — this is a reference, not the focal point
-- No colored fills in table cells. If a deal is a down round, a small red text tag "(↓ down)" may appear next to the amount — that is the only permitted color in the table.
+Each card: `F5F5F5` fill, thin `D0D0D0` border, no shadow, no color fill. Size the shape generously —
+`view issues` flags text overflow when a 40pt number will not fit the height you gave it.
 
-**Deal Link Implementation (pptxgenjs):**
-In pptxgenjs, hyperlinks are added to table cells using the `options.hyperlink` property on the cell object:
-```javascript
-// Table cell with Capital IQ deal link
-{
-  text: "View →",
-  options: {
-    hyperlink: {
-      url: `https://www.capitaliq.spglobal.com/web/client?#offering/capitalOfferingProfile?id=${transactionId}`
-    },
-    color: "2B5797",
-    fontSize: 9,
-    fontFace: "Arial"
-  }
-}
-```
+**Top Filings table.** 4–6 rows, the biggest disclosed offerings.
 
-**Table Centering (pptxgenjs):**
-Always center the deal table on the slide. Calculate the x position dynamically:
-```javascript
-const SLIDE_W = 13.33; // 16:9 slide width
-const TABLE_W = 12.5;  // total table width (sum of all column widths)
-const TABLE_X = (SLIDE_W - TABLE_W) / 2; // ≈ 0.42"
+| Column | Content |
+|---|---|
+| Issuer | Legal name + CIK |
+| Round | Inferred from name, else bucket, else `not stated` |
+| Filed | `file_date` as `MMM DD` |
+| First Sale | `Date of First Sale` as `MMM DD`, or `—` |
+| Offering | `Total Offering Amount` as `$X.XM`, or `declined` |
+| St | `biz_states` |
+| Acc # | accession number (the drill-down handle) |
 
-slide.addTable(tableRows, {
-  x: TABLE_X,
-  y: tableY,
-  w: TABLE_W,
-  colW: [1.8, 0.9, 0.9, 0.9, 1.0, 1.1, 1.2, 1.6, 0.7], // Company, Type, Announced, Closed, Amount, Pre-$, Post-$, Lead, Link
-  // ... other options
-});
-```
-Adjust `colW` values as needed, but always recompute `TABLE_X` from `(SLIDE_W - sum(colW)) / 2` to keep the table centered.
+Header row `1A1A1A` fill, white text; body `F5F5F5`. **No colored cell fills.** Center the table
+horizontally: with `SLIDE_W = 25.4cm` and a 24.2cm table, `x = 0.6cm`. Recompute
+`x = (SLIDE_W - w) / 2` whenever you change the width — never left-align to the slide edge.
 
-**Footer:**
-- Small text in medium gray: "Deal Flow Digest · [Period] · Sources: S&P Global Capital IQ · Generated [Date]"
-
-**General color rules (enforce strictly):**
-- Company logos are the only "full color" elements on the slide — they appear as-is from the source.
-- Deal links use muted blue (`2B5797`) — this is the only non-monochrome text color besides semantic red/green.
-- Outside of logos and links, the slide should look correct printed on a black-and-white printer.
-- Never apply color to backgrounds, accent bars, decorative shapes, or section dividers.
-- When in doubt, leave it gray.
-
-#### Code Structure
-
-```javascript
-const pptxgen = require("pptxgenjs");
-const pres = new pptxgen();
-pres.layout = "LAYOUT_16x9";
-pres.title = "Deal Flow Digest";
-
-const slide = pres.addSlide();
-const SLIDE_W = 13.33; // 16:9 slide width in inches
-
-// 1. Dark header bar with title and period
-// 2. Stat cards row (4 cards: Total Raised, # Rounds, Avg Pre-Money, Largest Round)
-// 3. Key takeaways section with logos (include valuation context)
-// 4. Top deals table with Announced, Closed, Pre-Money, Post-Money columns and Capital IQ deal links
-//    - Center the table: x = (SLIDE_W - tableWidth) / 2
-// 5. Footer
-
-pres.writeFile({ fileName: "/home/claude/deal-flow-digest.pptx" });
-```
-
-Use factory functions (not shared objects) for shadows and repeated styles per the pptxgenjs pitfalls guidance.
+**Footer (two lines, 8pt `6B6B6B`):**
+1. `US Regulation D private placements only — excludes non-US, late-stage, and clean-tech project
+   rounds, and carries no investor or valuation data. Source: SEC EDGAR Form D full-text search,
+   retrieved <date>.`
+2. The **exact query URL**, then the AI disclaimer: "Analysis is AI-generated — please confirm all
+   outputs".
 
 ### Step 8: QA the Slide
 
-Follow the QA process from the PPTX skill:
+Never ship an unviewed deck.
 
-1. **Content QA:** `python -m markitdown deal-flow-digest.pptx` — verify all text, numbers, company names, valuation figures, and deal links are correct
-2. **Visual QA:** Convert to image and inspect:
-   ```bash
-   python /mnt/skills/public/pptx/scripts/office/soffice.py --headless --convert-to pdf deal-flow-digest.pptx
-   pdftoppm -jpeg -r 200 deal-flow-digest.pdf slide
-   ```
-   Check for overlapping elements, text overflow, alignment issues, low-contrast text, logo sizing problems, and that deal link text is visible.
-3. **Link QA:** Verify that the Capital IQ URLs in the table are correctly formatted with the right transaction IDs.
-4. **Fix and re-verify** — at least one fix-and-verify cycle before declaring done.
+```bash
+officecli view out/funding-digest.pptx issues                  # overflow, low contrast, empty fields
+officecli view out/funding-digest.pptx outline                 # read the argument back
+officecli view out/funding-digest.pptx screenshot -o out/preview.png --page 1
+officecli get out/funding-digest.pptx /slide[1]/table[1]/tr[2]/tc[5]
+```
+
+1. **Issue gate:** `view issues` is authoritative. Real output from a verification build:
+   `[O1] /slide[1]/shape[@id=100001]: text overflow: 2 lines at 40.0pt need 96pt, usable 32pt.
+   suggest.height=3.65cm` — fix and re-run.
+2. **Content:** read every cell back with `get` and confirm each amount, date, and CIK matches an
+   accession number from the EDGAR response. No cell may contain a figure you did not pull.
+3. **Visual:** open `out/preview.png` and look at it — overlap, truncation, alignment, contrast,
+   logo sizing, and that the accession links are legible.
+4. **Coverage line present:** the subtitle and footer must both say US-Form-D-only.
+5. **Fix and re-verify** at least once before declaring done.
 
 ### Step 9: Present Results
 
-1. Copy the final `.pptx` to `/mnt/user-data/outputs/`
-2. Use `present_files` to share the slide
-3. Provide a 2–3 sentence verbal summary:
-   - "Your digest covers X rounds totaling $Y raised across [sectors]."
-   - Call out the single most notable deal and its valuation
-   - Flag any concerning trends (down rounds, valuation compression, etc.)
+1. Return the path `out/funding-digest.pptx` so the user can open it.
+2. **No external sends.** This skill writes a file; it never emails, uploads, or shares.
+3. Verbal summary, 2–3 sentences:
+   - "N US Reg D filings matched the query, offering $X in aggregate."
+   - Name the largest disclosed offering and its exemption type.
+   - **Restate the limit out loud:** "Non-US and late-stage rounds aren't in this."
 
 ## Error Handling
 
-### Entity Resolution Failures
-- **Empty results for a known company:** First check `get_info_from_identifiers` — if that fails, try the alias from `references/sector-seeds.md` or the `company_id` directly. Common brand→legal mismatches: Together AI → "Together Computer, Inc.", Character.ai → "Character Technologies, Inc.", Runway ML → "Runway AI, Inc.".
-- **Subsidiary companies:** DeepMind, GitHub, Instagram, WhatsApp, YouTube, BeReal, etc. are subsidiaries — they have zero independent funding rounds. Note these as "acquired/subsidiary" in context but do not report them as "no activity."
-- **Defunct companies:** Companies like Convoy (shut down Oct 2023) still resolve in S&P Global but will never have new activity. The `references/sector-seeds.md` file flags these — check it before including a company.
-- **`get_funding_summary_from_identifiers` errors or returns zeros:** Fall back to `get_rounds_of_funding_from_identifiers` — the summary tool is less reliable. Never rely on the summary tool as the sole data source.
-- **Wrong `role` parameter:** If investor-perspective queries return empty, verify you're using `company_investing_in_round_of_funding`, not `company_raising_funds` (and vice versa).
+### Query failures
+- **`hits.total` = 0:** report zero rounds with the query cited. Do not broaden the terms to
+  manufacture results. Confirm the window — `enddt` is inclusive and a future `startdt` returns 0.
+- **Results dominated by funds/REITs:** apply the Rule 1 filter and report the filtered count plus
+  what was dropped. Do not relabel a REIT blind pool as a venture round.
+- **No `sics`:** expected — 104 of 106 filings in the verified January query had none. Classify by
+  name and `Industry Group`.
+- **Phrase miss:** `q=Series A` (unquoted) tokenizes loosely and returns junk. Always quote: `%22Series+A%22`.
+- **`Total Offering Amount` missing from the document:** the filing may say "Decline to Disclose."
+  Show `declined` — never impute an amount from the sector or the company's history.
+- **`Date of First Sale` is months before the filing date:** normal. Label both, footnote the rule.
+- **Prior window returns nothing:** say "no prior-period comparison," not "down to zero."
 
-### Data Quality Issues
-- **No activity in period:** If a sector had zero funding rounds, note this explicitly on the slide ("No transactions recorded in [Sector] during the period") — absence of activity is itself informative.
-- **Sparse valuation data:** If pre-money and post-money valuations are undisclosed for most transactions, note the data limitation in a footer annotation and use "—" in the table. Adjust the stat card to show a different metric (e.g., Median Round Size) instead of Avg Pre-Money.
-- **Logo retrieval failures:** The `simple-icons` npm package provides ~43% coverage for typical deal flow companies. For the remainder, use the `sharp`-generated initial-based fallback. Keep a consistent icon style — don't mix random approaches. If `simple-icons` or `sharp` fail to install, fall back to pptxgenjs shape-based initials (gray ellipse + white text overlay) which require no external dependencies.
-- **Too many deals for one slide:** If there are more than 6 notable deals, show the top 6 in the table and add a footnote: "+N additional deals not shown." Prioritize by deal size.
-- **Large universes:** For multi-sector digests with 100+ companies, batch all API calls in groups of 15–20. Prioritize depth on notable deals over completeness on minor ones.
-- **Stale seeds:** If competitor expansion returns very few results for a sector, the seed companies may be too niche. Broaden by adding 2–3 more well-known names and re-expanding.
-- **Invalid transaction IDs for links:** If a `transaction_id` from the funding tool doesn't produce a valid Capital IQ URL, omit the link cell for that row rather than including a broken link.
+### Entity coverage failures
+- **A named company has no Form D hit:** report it honestly. Common legitimate reasons — it is
+  non-US, it is a subsidiary that does not file separately, it raised through a structure outside
+  Reg D, or it simply has not filed. See `references/sector-seeds.md` for the exclusion list.
+- **Round type unknown:** `not stated`. Do not infer a stage from the amount.
+
+### Build failures
+| Error | Cause |
+|---|---|
+| `File already exists` | `create --force`, or `rm` first |
+| `Batch complete: 0 succeeded` | one item failed and the array rolled back — read the failing index |
+| `text overflow` in `view issues` | the shape height is too small for the font size; use `suggest.height` |
+| `No shape found with @id=…` | use the `@id` printed by the `add` that created it, or the positional `shape[N]` path |
+| `UNSUPPORTED props: link` on a cell | table cells cannot hyperlink — put the accession as text and a linked shape beside it |
+| Content blank in PowerPoint | `officecli close` before opening it elsewhere |
+| `sharp` / `simple-icons` install fails | drop to pptx ellipse + text initial — zero dependencies |
 
 ## Example Prompts
 
-- "Give me a weekly deal flow digest for AI and fintech"
-- "Summarize this week's funding in biotech"
-- "Deal roundup for my coverage — cybersecurity, cloud infrastructure, and dev tools — last 2 weeks"
-- "What happened in venture this week across all sectors I follow?"
-- "Quick deal flow slide for climate tech this month"
+- "Give me a funding digest for AI infrastructure this month"
+- "US venture roundup, January, biotech and medtech"
+- "What filed Form D last week with offerings over $25M?"
+- "Private placement recap — fintech, last 30 days"
+- "Compare this month's Reg D filings to the prior month"
+
+> **Coverage note:** all of the above return **US Regulation D private placements only**. If the user
+> wants non-US, late-stage, or clean-tech project rounds, say that Form D cannot supply them before
+> building anything.

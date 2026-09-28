@@ -6,8 +6,8 @@ description: Build a .pptx deck as a file on disk using the officecli CLI — fo
 # pptx-author
 
 Build PowerPoint decks as **file artifacts** with `officecli`. This is the toolchain skill behind
-`pitch-deck`, `teaser`, `cim-builder`, `strip-profile`, `morning-note`, `tear-sheet`, `ic-memo`,
-`client-report`, and `deck-refresh`.
+`pitch-deck`, `teaser`, `cim-builder`, `strip-profile`, `morning-note`, `tear-sheet`,
+`ic-memo`, and `deck-refresh`.
 
 For the full officecli element vocabulary and the visual-design rules, load **`officecli-pptx`**
 (and **`officecli-pitch-deck`** for investor decks specifically). This skill is the FSI layer:

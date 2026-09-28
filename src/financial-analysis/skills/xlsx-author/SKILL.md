@@ -166,7 +166,7 @@ officecli help xlsx <element> --json      # machine-readable
 
 ```bash
 officecli validate out/model.xlsx                    # OpenXML schema check
-officecli view out/model.xlsx issues                 # formula errors, broken refs, bad names
+officecli view out/model.xlsx issues                 # formula errors, broken refs, narrow columns
 officecli get out/model.xlsx /DCF/B3                 # formula + computed value
 officecli close out/model.xlsx
 ```
@@ -178,8 +178,38 @@ officecli close out/model.xlsx
 ```
 
 Also covers `formula_not_evaluated`, `formula_ref_missing_sheet`, `definedname_broken`,
-`definedname_target_missing`, `numeric_overflow`, `general_precision_loss`. Filter with
+`definedname_target_missing`, `general_precision_loss`. Filter with
 `--type formula_eval_error`, or `--type content` for the broad bucket. Add `--json` to parse it.
+A clean model reports `Found 0 issue(s):`.
+
+### `numeric_overflow` — narrow columns
+
+This is the one that bites every financial model, because a formatted number wider than its
+column renders as `###` — a delivered model full of hashes looks broken even when every
+formula is right:
+
+```
+{"subtype":"numeric_overflow","path":"/Inputs/C2",
+ "message":"numeric overflow: '1,250,000,000' at 11.0pt needs 17.5 width, column C is 8.43",
+ "suggestion":"suggest.width=18; widen column C to at least 18"}
+```
+
+Fix it with `set` on the existing column, addressed by **1-based index**:
+
+```bash
+officecli set out/model.xlsx "/Inputs/col[3]" --prop width=18     # col[3] = column C
+```
+
+> **⚠️ Do NOT use `add --type column` to widen a column.** It **inserts a new column and shifts
+> every cell to its right**, silently corrupting the model — a value written to `C2` ends up in
+> `D2` and every formula that referenced it by address now points at the wrong cell. The
+> `suggestion` field names a width value, not a command; it is not a copy-pasteable fix.
+> Use `set /Sheet/col[N] --prop width=…`, or `officecli help xlsx column` if unsure.
+>
+> The same trap applies to rows: check `officecli help xlsx row` before inserting.
+
+A good default is to widen the money columns up front rather than chase the warnings — a DCF with
+`#,##0` on a 9-digit revenue needs roughly width 18.
 
 To inspect one specific class by hand: `officecli query out/model.xlsx "cell[type=Error]"`.
 
@@ -196,3 +226,5 @@ Load **`audit-xls`** for the full pre-delivery audit.
 | Value lands in the wrong cell | you used a sheet-only parent; use `Sheet!C5` |
 | Formulas read as blank | batch not flushed — `officecli close` before a non-officecli reader |
 | `Batch complete: 0 succeeded` | one item in the array failed; the array is atomic, read the failing index |
+| Numbers render as `###` | `view issues` reports `numeric_overflow` — widen with `set /Sheet/col[N] --prop width=…` |
+| Cells moved one column right | you used `add --type column`, which **inserts**; use `set` on the existing column |
