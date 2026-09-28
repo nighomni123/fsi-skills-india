@@ -1,10 +1,63 @@
-This directory contains a derivative port of skills from
-https://github.com/anthropics/financial-services
+fsi-skills-india
+================
 
-Copyright (c) Anthropic, PBC. Licensed under the license reproduced in
-LICENSE.upstream. The original work is unmodified in substance; this port
-adapts toolchain instructions and data-source references for the
-DeepSeek Harness and the officecli CLI.
+This project is a **fork** of Anthropic's `financial-services` skill collection.
 
-market-data-sources/ and the adaptations under tools/ are new work
-adding to that corpus, not part of the upstream repository.
+  Upstream:  https://github.com/anthropics/financial-services
+  Upstream licence: Apache License 2.0 (reproduced in LICENSE)
+  Fork of upstream: includes the skills, their methodology, and the three
+  partner-authored skills listed below.
+
+
+Attribution
+-----------
+
+Copyright Anthropic, PBC and the upstream contributors.
+Licensed under the Apache License, Version 2.0.
+
+The original skills — DCF, LBO, three-statement, comps, pitch decks, IC memos,
+equity research, fund-admin and KYC workflows, and their reference material — are
+Anthropic's work and remain under the upstream licence reproduced in LICENSE.
+
+
+Partner-authored skills
+-----------------------
+
+Three skills originate from partner plugins and carry their own copyright
+notices, which are preserved verbatim in the skill directories:
+
+  `tear-sheet`, `earnings-preview-beta`, `funding-digest`
+      Copyright 2026-present Kensho Technologies, LLC.
+      Apache License 2.0 — see the `LICENSE` file inside each skill directory.
+
+These three were written against the S&P Capital IQ / Kensho connector. They are
+ported here to free public data sources; the original copyright notices are left
+intact and are **not** relicensed by this fork.
+
+
+Changes made in this fork
+-------------------------
+
+Everything below is a modification by this fork's authors and is offered under
+the same Apache License 2.0 terms.
+
+1. **Harness independence.** Toolchain rewritten from `openpyxl` / `python-pptx` /
+   `docx-js` / `pptxgenjs` and the live-Excel (Office JS) code path to the
+   `officecli` CLI. Claude Code / Cowork plugin packaging (`.claude-plugin/`,
+   `marketplace.json`, `hooks/`, `.mcp.json`, `agent.yaml` cookbooks) is no longer
+   required; the skills are portable Agent Skills format and install to any
+   harness that reads `SKILL.md`.
+
+2. **Data source substitution.** The paid LSEG Workspace and S&P Capital IQ MCP
+   connectors are replaced with free public sources. The source inventory lives in
+   the `market-data-sources` and `india-market-data` skills.
+
+3. **India focus.** Skills are adapted for Indian markets: April–March fiscal
+   year, lakh/crore units, Ind AS, NSE/BSE, SEBI LODR, and Indian index
+   benchmarks. Capabilities that have no Indian equivalent are recorded in
+   `NOT-ADAPTABLE.md` rather than approximated.
+
+4. **Defect fixes** carried in from the port, each verified against the CLI:
+   the `validate_dcf.py` WACC range check never executed upstream (it called
+   `.get()` on an openpyxl `Workbook`); the `add --type column` data-shift trap;
+   and the column-width (`numeric_overflow`) QA gate.

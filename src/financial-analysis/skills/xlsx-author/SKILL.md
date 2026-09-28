@@ -221,6 +221,17 @@ To inspect one specific class by hand: `officecli query out/model.xlsx "cell[typ
 A model with `#REF!`/`#VALUE!`/`#DIV/0!` cells, or an unbalanced Checks tab, is not deliverable.
 Load **`audit-xls`** for the full pre-delivery audit.
 
+**Then look at it.** Issue-free does not mean it reads well — `###` columns, a hidden input
+sheet, and a cramped first sheet all pass every machine gate:
+
+```bash
+officecli view out/model.xlsx screenshot -o out/model.png
+```
+
+If your model has no image input, delegate the look to a multimodal subagent (give it the
+absolute path and tell it to open the file). If neither you nor any subagent can see images, say
+so in your final message rather than implying you checked the render.
+
 ## Common failures
 
 | Error | Cause |

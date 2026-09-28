@@ -119,6 +119,27 @@ in sequence don't form a coherent argument, the deck isn't done, no matter how i
 For deck-specific judgment — the visual floor, grid, palette discipline, connector canon, and the
 Deliv checklist — load **`officecli-pitch-deck`**.
 
+### The visual pass is a real step — do it, or say you didn't
+
+`issues` and `outline` do **not** catch overlapping shapes, text running off-slide, unreadable
+colours, or a slide that simply looks wrong. Those need someone to look at the render.
+
+**If your model cannot accept images, delegate the look to a multimodal subagent** rather than
+skipping the step. Give it the absolute path and tell it to open the file:
+
+```
+Read /abs/path/out/preview.png with your image-reading tool. Judge it as a viewer:
+what does this show, does any text overflow or overlap, is anything unreadable or
+cut off? If you cannot read images at all, say so plainly rather than guessing.
+```
+
+Then act on what it reports and re-render.
+
+**If no vision is available at all — yours or a subagent's — say so in your final message.** Write
+"validated and issue-free; the visual pass is unverified because this model has no image input and
+no multimodal worker was reachable". Never report a visual pass that did not happen: a deck that
+passes every machine gate and still renders badly is exactly the failure this step exists to catch.
+
 ## Common failures
 
 | Error | Cause |
