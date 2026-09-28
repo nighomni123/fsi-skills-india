@@ -1,7 +1,8 @@
 # Anthropic financial-services skills → DeepSeek Harness + officecli
 
 A port of [anthropics/financial-services](https://github.com/anthropics/financial-services)
-(49 skills across 6 FSI verticals, plus 11 partner-built market-data skills) from
+**61 skills** (49 across 6 FSI verticals, plus 11 partner-built market-data skills, plus
+`market-data-sources`) from
 **Claude Code / Cowork + openpyxl + python-pptx + paid data connectors** to
 **DeepSeek Harness + officecli + free data sources**.
 
@@ -99,6 +100,33 @@ them they cannot, so each ported skill now carries:
 - Alpha Vantage's free tier is **25 requests/day** — single-name work only.
 - EDGAR is US-centric; 20-F/40-F/6-K XBRL coverage is thin.
 - SEC Form D covers US private placements only — no late-stage, clean-tech, or non-US rounds.
+
+## Verified, not assumed
+
+Every officecli command in the ported skills was executed, and every "free source" endpoint was
+called live. That found real defects rather than confirming assumptions:
+
+| Found | Consequence |
+|---|---|
+| `add --type column` **inserts** and shifts cells; `set /Sheet/col[N] --prop width=` is the real fix | would silently corrupt models; `xlsx-author` now warns |
+| `view issues` reports `numeric_overflow` (narrow columns render `###`) | a delivered model full of hashes; now part of the QA gate |
+| `view_dcf.py` called `workbook.get()` on an openpyxl `Workbook` | the WACC range check **never fired upstream**; fixed and verified |
+| `create` has no `--template` flag; copying the file is the way | `pptx-author` documents the working method |
+| `merge` takes a ref as its value, not `"true"` | section-header pattern in the model skills |
+| `chartType=` is help-canonical; bare `type=` is an undocumented alias | made canonical in `xlsx-author` |
+| `monid /fetch` needs `-i`, not `--query` | AGENTS.md had it wrong; fixed and verified |
+
+Validation: `tools/validate.py` checks all 61 against DSH's own skill-loader rules
+(frontmatter, name/dir agreement, relative links) — 0 failures, with a negative control proving it
+still catches real breakage.
+
+## Known environment gap (not from this port)
+
+**`jq` is not installed**, and 9 pre-existing skills in `~/.dsh/skills` (`officecli-docx`,
+`officecli-pptx`, `officecli-xlsx`, `officecli-pitch-deck`, `officecli-financial-model`,
+`officecli-academic-paper`, `officecli-data-dashboard`, `officecli-word-form`, `morph-ppt`) use `jq`
+in their Delivery Gates. Those gates will fail until `jq` is installed. The ported skills here avoid
+`jq` entirely.
 
 ## Attribution
 

@@ -62,9 +62,24 @@ def check(path: Path) -> list[str]:
         problems.append("description too short to drive skill matching")
 
     for link in re.findall(r"\]\((?!https?://|#)([^)]+)\)", strip_fences(body)):
-        if not (path.parent / link.split("#")[0]).exists():
+        target = link.split("#")[0]
+        if is_placeholder(target):
+            continue
+        if not (path.parent / target).exists():
             problems.append(f"broken relative link: {link}")
     return problems
+
+
+def is_placeholder(target: str) -> bool:
+    """True for template placeholders like `[IR URL]`, `[TICKER]`, `[name]`.
+
+    These appear inside documented output formats ("Source: ... ([IR URL])") and
+    are not navigation. Heuristic: a space in the target, or an ALL-CAPS token,
+    both of which no real file in this tree has.
+    """
+    return bool(re.fullmatch(r"[\[\(\{<]?[\sA-Z0-9_\-]{2,}[\]\)\}>]?", target)) and (
+        " " in target or target.strip("[](){}<>").upper() == target.strip("[](){}<>")
+    )
 
 
 def strip_fences(body: str) -> str:
