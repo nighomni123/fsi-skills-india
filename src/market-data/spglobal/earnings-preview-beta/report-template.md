@@ -550,6 +550,8 @@ The report is a single self-contained HTML file with:
     </div>
 
     <!-- Figure 4: Business Segment Revenue -->
+    <!-- Figure 4: Business Segment Revenue — DELETE THIS FIGURE ENTIRELY if segment detail is not
+         retrievable from free sources. Never infer segments from the total. -->
     <h4 class="figure-title">Figure 4: Business Segment Revenue</h4>
     <table>
       <thead>
@@ -561,10 +563,13 @@ The report is a single self-contained HTML file with:
         </tr>
       </thead>
       <tbody>
-        <!-- Populate from segment data. Color-code y/y change with pos/neg classes. -->
+        <!-- Populate from XBRL segment members (srt:StatementBusinessSegmentsAxis) or the
+             10-Q/10-K segment footnote — record which in the source line. Colour y/y change with
+             pos/neg classes. If a prior-year quarter is missing, write "y/y not available". -->
       </tbody>
     </table>
-    <div class="source">Source: S&P Capital IQ</div>
+    <div class="source">Source: SEC EDGAR XBRL companyfacts, CIK [0000000000] (segment members) or the
+      segment footnote in the [Form 10-Q/10-K, filed YYYY-MM-DD].</div>
   </div>
 
   <!-- Page break for stock & competitor charts -->
@@ -575,7 +580,9 @@ The report is a single self-contained HTML file with:
       <div class="chart-container chart-full">
         <h4 class="figure-title">Figure 5: 1-Year Stock Price with Earnings Dates</h4>
         <canvas id="chart-price-annotated" style="max-height: 300px;"></canvas>
-        <div class="source">Source: S&P Capital IQ</div>
+        <div class="source">Source: yfinance <code>Ticker("[TICKER]").history(period="1y").Close</code> — EOD,
+          retrieved [YYYY-MM-DD]. Earnings markers from Alpha Vantage <code>EARNINGS</code>
+          <code>reportedDate</code>. Not real-time.</div>
       </div>
     </div>
 
@@ -584,7 +591,8 @@ The report is a single self-contained HTML file with:
       <div class="chart-container chart-full">
         <h4 class="figure-title">Figure 6: Stock Performance vs. Competitors — 1 Year (Indexed to 100)</h4>
         <canvas id="chart-comp-perf" style="max-height: 300px;"></canvas>
-        <div class="source">Source: S&P Capital IQ</div>
+        <div class="source">Source: yfinance EOD closes, all tickers rebased to the <strong>same common
+          base date</strong> ([YYYY-MM-DD]) — see appendix. Mixed base dates are not permitted.</div>
       </div>
     </div>
   </div>
@@ -596,11 +604,14 @@ The report is a single self-contained HTML file with:
       <div class="chart-container chart-full">
         <h4 class="figure-title">Figure 7: LTM P/E vs. Competitors</h4>
         <canvas id="chart-pe-comp" style="max-height: 280px;"></canvas>
-        <div class="source">Source: S&P Capital IQ</div>
+        <div class="source">Source: yfinance EOD close ÷ sum of each company's own most recent 4
+          reported quarters (SEC EDGAR XBRL for the subject; yfinance / company filings for peers).</div>
       </div>
     </div>
 
-    <!-- Figure 8: Competitor Comparison Table -->
+    <!-- Figure 8: Competitor Comparison Table — the NTM P/E column CARRIES THE CONSENSUS BASIS.
+         Subject NTM EPS = IBES (Alpha Vantage). Peer NTM EPS = Yahoo Finance analyst estimates.
+         Never present these in one unlabelled column. -->
     <h4 class="figure-title">Figure 8: Competitor Comparison</h4>
     <table>
       <thead>
@@ -615,10 +626,15 @@ The report is a single self-contained HTML file with:
         </tr>
       </thead>
       <tbody>
-        <!-- Highlight the subject company row with class="highlight-row" -->
+        <!-- Highlight the subject company row with class="highlight-row".
+             Add a <span class="basis">IBES</span> / <span class="basis">YAHOO</span> tag to the
+             NTM P/E cell of every row. -->
       </tbody>
     </table>
-    <div class="source">Source: S&P Capital IQ</div>
+    <div class="source">Source: yfinance (market cap, EOD closes, Yahoo consensus for peers);
+      Alpha Vantage <code>EARNINGS_ESTIMATES</code> (IBES) for the subject's NTM EPS only;
+      SEC EDGAR XBRL for reported EPS. <strong>NTM P/E is IBES for the subject and Yahoo-derived for
+      peers — these are different contributor pools and the comparison is not strictly like-for-like.</strong></div>
   </div>
 
   <!-- ════════════════════════════════════════════ -->
@@ -626,9 +642,15 @@ The report is a single self-contained HTML file with:
   <!-- ════════════════════════════════════════════ -->
   <div class="page-break appendix" id="appendix">
     <div class="ai-disclaimer">Analysis is AI-generated — please confirm all outputs</div>
-    <h2 class="section-title">Appendix: Data Sources & Calculations</h2>
-    <p style="font-size: 11px; color: #666; margin-bottom: 12px;">
+    <h2 class="section-title">Appendix: Data Sources, Calculations &amp; Manual Review</h2>
+    <p style="font-size: 11px; color: #666; margin-bottom: 6px;">
       Every claim in this report is hyperlinked to its entry below. Click any highlighted text to jump here.
+    </p>
+    <p style="font-size: 11px; color: #444; background: #f4f5f9; border-left: 3px solid #1a1a4e; padding: 5px 10px; margin-bottom: 12px;">
+      Consensus basis: <strong>[IBES via Alpha Vantage | Yahoo Finance analyst estimates via yfinance]</strong>
+      · Actuals: SEC EDGAR XBRL companyfacts, CIK [0000000000] · Prices: yfinance EOD close
+      · Retrieved: <strong>[YYYY-MM-DD]</strong> · <strong>All data is end-of-day or delayed — not real-time.</strong>
+      · Alpha Vantage free tier: 25 requests/day, single-name only.
     </p>
     <table>
       <thead>
@@ -636,55 +658,183 @@ The report is a single self-contained HTML file with:
           <th style="width: 40px;">Ref</th>
           <th style="width: 170px;">Fact</th>
           <th style="width: 75px;">Value</th>
-          <th>Source & Derivation</th>
+          <th>Source &amp; Derivation</th>
         </tr>
       </thead>
       <tbody>
-        <!-- Group: Quarterly Financials -->
+        <!-- Group: Quarterly Financials — every row is an EDGAR XBRL fact with tag, frame, form,
+             accession and filing date. A quarter derived as FY − 9M says so and names the accession. -->
         <tr><td colspan="4" class="appendix-group">Quarterly Financials</td></tr>
         <tr id="ref-1">
           <td class="ref-id">1</td>
           <td>[Q# FY#### Revenue]</td>
           <td class="num">$[XX.X]B</td>
           <td class="source-detail">
-            <span class="src-label">S&P Capital IQ</span> — get_financial_line_item_from_identifiers(identifier='[TICKER]', line_item='revenue', period_type='quarterly', period='[Q# FY####]')
+            <span class="src-label">SEC EDGAR XBRL</span> — companyfacts CIK[0000000000], us-gaap:Revenues,
+            frame=CY20XXQ[X], form=10-Q, accn=[0000000000-XX-000000], filed [YYYY-MM-DD], retrieved [YYYY-MM-DD]
           </td>
         </tr>
         <tr id="ref-2">
           <td class="ref-id">2</td>
-          <td>[Q# FY#### Diluted EPS]</td>
-          <td class="num">$[X.XX]</td>
+          <td>[Q# FY#### Revenue — derived quarter]</td>
+          <td class="num">$[XX.X]B</td>
           <td class="source-detail">
-            <span class="src-label">S&P Capital IQ</span> — get_financial_line_item_from_identifiers(identifier='[TICKER]', line_item='diluted_eps', period_type='quarterly', period='[Q# FY####]')
+            <span class="src-label">SEC EDGAR XBRL</span> — companyfacts CIK[0000000000], us-gaap:Revenues,
+            derived Q4 = FY $[XXX.X]M − 9M $[XXX.X]M, both from accn=[0000000000-XX-000000] (same 10-K)
           </td>
         </tr>
         <tr id="ref-3">
           <td class="ref-id">3</td>
-          <td>[Q# FY#### Gross Profit]</td>
-          <td class="num">$[XX.X]B</td>
+          <td>[Q# FY#### Diluted EPS]</td>
+          <td class="num">$[X.XX]</td>
           <td class="source-detail">
-            <span class="src-label">S&P Capital IQ</span> — get_financial_line_item_from_identifiers(identifier='[TICKER]', line_item='gross_profit', period_type='quarterly', period='[Q# FY####]')
+            <span class="src-label">SEC EDGAR XBRL</span> — companyfacts CIK[0000000000],
+            us-gaap:EarningsPerShareDiluted, frame=CY20XXQ[X], form=10-Q, accn=[…], filed [YYYY-MM-DD]
           </td>
         </tr>
         <tr id="ref-4">
           <td class="ref-id">4</td>
-          <td>[Q# FY#### Gross Margin]</td>
-          <td class="num">[XX.X%]</td>
+          <td>[Q# FY#### Gross Profit]</td>
+          <td class="num">$[XX.X]B</td>
           <td class="source-detail">
-            <span class="formula"><a href="#ref-3" class="data-ref">Gross Profit $XX.XB</a> / <a href="#ref-1" class="data-ref">Revenue $XX.XB</a> = XX.X%</span><br>
-            <span class="src-label">S&P Capital IQ</span> (calculated)
+            <span class="src-label">SEC EDGAR XBRL</span> — companyfacts CIK[0000000000], us-gaap:GrossProfit,
+            frame=CY20XXQ[X], form=10-Q, accn=[…], filed [YYYY-MM-DD]
           </td>
         </tr>
         <tr id="ref-5">
           <td class="ref-id">5</td>
+          <td>[Q# FY#### Gross Margin]</td>
+          <td class="num">[XX.X%]</td>
+          <td class="source-detail">
+            <span class="formula"><a href="#ref-4" class="data-ref">Gross Profit $XX.XB</a> / <a href="#ref-1" class="data-ref">Revenue $XX.XB</a> = XX.X%</span><br>
+            <span class="src-label">SEC EDGAR XBRL</span> (calculated)
+          </td>
+        </tr>
+        <tr id="ref-6">
+          <td class="ref-id">6</td>
           <td>[Q# FY#### Revenue y/y Growth]</td>
           <td class="num">[+/-X.X%]</td>
           <td class="source-detail">
-            <span class="formula">(<a href="#ref-1" class="data-ref">[Q# FY## Rev $XX.XB]</a> - <a href="#ref-N" class="data-ref">[Q# FY## Rev $XX.XB]</a>) / <a href="#ref-N" class="data-ref">[Q# FY## Rev $XX.XB]</a> = X.X%</span><br>
-            <span class="src-label">S&P Capital IQ</span> (calculated)
+            <span class="formula">(<a href="#ref-1" class="data-ref">[Q# FY## Rev $XX.XB]</a> - <a href="#ref-2" class="data-ref">[Q# FY## Rev $XX.XB]</a>) / <a href="#ref-2" class="data-ref">[Q# FY## Rev $XX.XB]</a> = X.X%</span><br>
+            <span class="src-label">SEC EDGAR XBRL</span> (calculated)
+          </td>
+        </tr>
+        <tr id="ref-7">
+          <td class="ref-id">7</td>
+          <td>Segment revenue — [segment name]</td>
+          <td class="num">$[X,XXX]M</td>
+          <td class="source-detail">
+            <span class="src-label">SEC EDGAR XBRL</span> — companyfacts CIK[0000000000], us-gaap:[Tag],
+            member=[segment axis member], frame=CY20XXQ[X]. <span class="excerpt">Or: segment footnote,
+            Form 10-Q filed [YYYY-MM-DD], accn=[…]. Record which.</span>
           </td>
         </tr>
         <!-- Continue for all financial data points... -->
+
+        <!-- Group: Estimates, Consensus & Revisions — the IBES-sourced core of the report.
+             Every consensus figure carries an IBES tag; every peer figure carries a Yahoo tag. -->
+        <tr><td colspan="4" class="appendix-group">Estimates, Consensus &amp; Revisions <span class="basis">IBES</span></td></tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Consensus EPS — [Q# FY####] <span class="basis">IBES</span></td>
+          <td class="num">$[X.XX]</td>
+          <td class="source-detail">
+            <span class="src-label">Alpha Vantage EARNINGS_ESTIMATES</span> (IBES-sourced) —
+            symbol=[TICKER], horizon="fiscal quarter", date=[YYYY-MM-DD],
+            field=<code>eps_estimate_average</code>, analyst_count [N], retrieved [YYYY-MM-DD]
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Consensus EPS range — [Q# FY####]</td>
+          <td class="num">$[X.XX]–$[X.XX]</td>
+          <td class="source-detail">
+            <span class="src-label">Alpha Vantage EARNINGS_ESTIMATES</span> —
+            fields <code>eps_estimate_low</code> / <code>eps_estimate_high</code>, date=[YYYY-MM-DD],
+            retrieved [YYYY-MM-DD]
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Estimate dispersion — [Q# FY####]</td>
+          <td class="num">[XX.X%]</td>
+          <td class="source-detail">
+            <span class="formula">(<a href="#ref-N" class="data-ref">High $X.XX</a> - <a href="#ref-N" class="data-ref">Low $X.XX</a>) / <a href="#ref-N" class="data-ref">Mean $X.XX</a> = XX.X%</span><br>
+            <span class="src-label">Alpha Vantage EARNINGS_ESTIMATES</span> (calculated)
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>EPS revision drift, 90 days — [Q# FY####]</td>
+          <td class="num">[+/-X.X%]</td>
+          <td class="source-detail">
+            <span class="formula">(<a href="#ref-N" class="data-ref">avg 1.5300</a> - <a href="#ref-N" class="data-ref">avg_90_days_ago 1.4900</a>) / 1.4900 = +2.7%</span><br>
+            <span class="src-label">Alpha Vantage EARNINGS_ESTIMATES</span> — fields
+            <code>eps_estimate_average</code> / <code>eps_estimate_average_90_days_ago</code>, date=[YYYY-MM-DD]
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Net revision breadth, 30 days — [Q# FY####]</td>
+          <td class="num">[+/-N]</td>
+          <td class="source-detail">
+            <span class="formula">up [N] - down [N] = [+/-N]</span><br>
+            <span class="src-label">Alpha Vantage EARNINGS_ESTIMATES</span> — fields
+            <code>eps_estimate_revision_up_trailing_30_days</code> /
+            <code>…_down_trailing_30_days</code>.
+            <span class="excerpt">A <code>null</code> on either side is excluded, not read as zero.</span>
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Peer consensus basis</td>
+          <td class="num">N/A</td>
+          <td class="source-detail">
+            <span class="excerpt">Peer NTM EPS comes from Yahoo Finance analyst estimates, not IBES.
+            Alpha Vantage's 25 req/day free tier permits the subject company only. These are different
+            contributor pools; peer NTM P/E is not strictly like-for-like with the subject's.</span>
+          </td>
+        </tr>
+
+        <!-- Group: Surprise History -->
+        <tr><td colspan="4" class="appendix-group">Surprise History</td></tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Surprise % — [Q# FY####]</td>
+          <td class="num">[+/-X.X%]</td>
+          <td class="source-detail">
+            <span class="src-label">Alpha Vantage EARNINGS</span> — symbol=[TICKER],
+            quarterlyEarnings[fiscalDateEnding=[YYYY-MM-DD]].surprisePercentage; reportedEPS [X.XX] vs
+            estimatedEPS [X.XX], reportTime [pre/post-market], retrieved [YYYY-MM-DD]
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>Beat rate / mean surprise / σ — last [N] prints</td>
+          <td class="num">[x of N] / [X.X%]</td>
+          <td class="source-detail">
+            <span class="formula">mean [+X.X%], trimmed mean [+X.X%] (largest absolute surprise excluded), sample σ [X.X%] over n=[N]</span><br>
+            <span class="src-label">Alpha Vantage EARNINGS</span> (calculated). Quarters with no estimate are excluded and named in Manual Review.
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>The bar — mean surprise − 1σ</td>
+          <td class="num">[+/-X.X%]</td>
+          <td class="source-detail">
+            <span class="formula"><a href="#ref-N" class="data-ref">mean +X.X%</a> - <a href="#ref-N" class="data-ref">σ X.X%</a> = [+/-X.X%]</span><br>
+            <span class="src-label">Alpha Vantage EARNINGS</span> (calculated)
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>1-day post-print move — [Q# FY####]</td>
+          <td class="num">[+/-X.X%]</td>
+          <td class="source-detail">
+            <span class="formula">(<a href="#ref-N" class="data-ref">next-session close $XX.XX</a> - <a href="#ref-N" class="data-ref">print-day close $XX.XX</a>) / print-day close</span><br>
+            <span class="src-label">yfinance</span> EOD close (calculated)
+          </td>
+        </tr>
 
         <!-- Group: Valuation -->
         <tr><td colspan="4" class="appendix-group">Valuation</td></tr>
@@ -693,7 +843,8 @@ The report is a single self-contained HTML file with:
           <td>Current Stock Price — [TICKER]</td>
           <td class="num">$[XXX.XX]</td>
           <td class="source-detail">
-            <span class="src-label">S&P Capital IQ</span> — get_prices_from_identifiers(identifier='[TICKER]', periodicity='day')
+            <span class="src-label">yfinance</span> — <code>Ticker("[TICKER]").history(period="1y").Close</code>,
+            EOD, retrieved [YYYY-MM-DD]. <span class="excerpt">Not real-time.</span>
           </td>
         </tr>
         <tr id="ref-N">
@@ -701,7 +852,8 @@ The report is a single self-contained HTML file with:
           <td>Market Cap — [TICKER]</td>
           <td class="num">$[XXX.X]B</td>
           <td class="source-detail">
-            <span class="src-label">S&P Capital IQ</span> — get_capitalization_from_identifiers(identifier='[TICKER]', capitalization='market_cap')
+            <span class="src-label">yfinance</span> — <code>Ticker("[TICKER]").info["marketCap"]</code>,
+            EOD-derived (price × shares), retrieved [YYYY-MM-DD]
           </td>
         </tr>
         <tr id="ref-N">
@@ -709,55 +861,94 @@ The report is a single self-contained HTML file with:
           <td>LTM P/E — [TICKER]</td>
           <td class="num">[XX.X]x</td>
           <td class="source-detail">
-            <span class="formula"><a href="#ref-20" class="data-ref">Price $XXX.XX</a> / (<a href="#ref-8" class="data-ref">Q1 EPS $X.XX</a> + <a href="#ref-9" class="data-ref">Q2 EPS $X.XX</a> + <a href="#ref-10" class="data-ref">Q3 EPS $X.XX</a> + <a href="#ref-11" class="data-ref">Q4 EPS $X.XX</a>) = XX.Xx</span><br>
-            <span class="src-label">S&P Capital IQ</span> (calculated)
+            <span class="formula"><a href="#ref-N" class="data-ref">Price $XXX.XX</a> / (<a href="#ref-3" class="data-ref">[Q# FY## EPS $X.XX]</a> + <a href="#ref-3" class="data-ref">[Q# FY## EPS $X.XX]</a> + <a href="#ref-3" class="data-ref">[Q# FY## EPS $X.XX]</a> + <a href="#ref-3" class="data-ref">[Q# FY## EPS $X.XX]</a>) = XX.Xx</span><br>
+            <span class="src-label">SEC EDGAR XBRL + yfinance</span> (calculated). Each company's own most
+            recent 4 reported quarters — not a fixed calendar window.
           </td>
         </tr>
         <tr id="ref-N">
           <td class="ref-id">[N]</td>
-          <td>NTM P/E — [TICKER]</td>
+          <td>NTM P/E — [TICKER] <span class="basis">IBES</span></td>
           <td class="num">[XX.X]x</td>
           <td class="source-detail">
-            <span class="formula"><a href="#ref-20" class="data-ref">Price $XXX.XX</a> / (<a href="#ref-N" class="data-ref">Q4'25E $X.XX</a> + <a href="#ref-N" class="data-ref">Q1'26E $X.XX</a> + <a href="#ref-N" class="data-ref">Q2'26E $X.XX</a> + <a href="#ref-N" class="data-ref">Q3'26E $X.XX</a>) = XX.Xx</span><br>
-            <span class="src-label">S&P Capital IQ</span> — get_consensus_estimates_from_identifiers(identifier='[TICKER]', period_type='quarterly', num_periods_forward=4). NTM EPS = sum of next 4 quarterly consensus mean EPS estimates.
+            <span class="formula"><a href="#ref-N" class="data-ref">Price $XXX.XX</a> / (<a href="#ref-N" class="data-ref">[Q#]E $X.XX</a> + <a href="#ref-N" class="data-ref">[Q#]E $X.XX</a> + <a href="#ref-N" class="data-ref">[Q#]E $X.XX</a> + <a href="#ref-N" class="data-ref">[Q#]E $X.XX</a>) = XX.Xx</span><br>
+            <span class="src-label">Alpha Vantage EARNINGS_ESTIMATES</span> (IBES-sourced) —
+            symbol=[TICKER], horizon="fiscal quarter", nearest 4 forward periods, field
+            <code>eps_estimate_average</code>, retrieved [YYYY-MM-DD].
+            NTM EPS = sum of the next 4 quarterly consensus mean estimates, not a single annual figure.
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>NTM P/E — [PEER] <span class="basis">YAHOO</span></td>
+          <td class="num">[XX.X]x</td>
+          <td class="source-detail">
+            <span class="formula"><a href="#ref-N" class="data-ref">Price $XXX.XX</a> / (<a href="#ref-N" class="data-ref">[4 forward quarterly estimates]</a>) = XX.Xx</span><br>
+            <span class="src-label">yfinance</span> — <code>Ticker("[PEER]").earnings_estimate</code>.
+            Yahoo Finance analyst estimates, <strong>not IBES</strong>, retrieved [YYYY-MM-DD].
           </td>
         </tr>
 
-        <!-- Group: Transcript Claims -->
-        <tr><td colspan="4" class="appendix-group">Transcript Claims</td></tr>
+        <!-- Group: Transcript Claims — DELETE THIS WHOLE GROUP if no verbatim source exists.
+             Never present a paraphrase as a quote. A press-release sentence is a quote from the
+             press release, not from the call, and must be labelled as such. -->
+        <tr><td colspan="4" class="appendix-group">Transcript &amp; Management Commentary</td></tr>
         <tr id="ref-N">
           <td class="ref-id">[N]</td>
           <td>[Fact, e.g., "Management guided comp sales +3-4%"]</td>
           <td class="num">N/A</td>
           <td class="source-detail">
-            <span class="excerpt">"We expect comp sales growth of 3-4% in Q4, driven by continued strength in grocery and health &amp; wellness."</span><br>
-            <span class="src-label">Source:</span> <span class="transcript-ref">[Q# FY#### Earnings Call Transcript]</span> (key_dev_id: [ID]) — [Speaker Name], [Title]
+            <span class="excerpt">"[exact verbatim sentence copied word for word from the source]"</span><br>
+            <span class="src-label">Source:</span> <span class="transcript-ref">[Q# FY#### Earnings Call Transcript]</span>
+            — <a href="[IR-hosted transcript URL]" target="_blank" class="src-url">[Company IR]</a>
+            — [Speaker Name], [Title].
+            <span class="excerpt">Or: Form 8-K Exhibit 99.1 press release,
+            <a href="https://www.sec.gov/Archives/edgar/data/[cik]/[accession-no-dashes]/[doc]" target="_blank" class="src-url">[EDGAR filing]</a>
+            (accn [number], filed [YYYY-MM-DD]) — a written document, not call commentary.</span>
           </td>
         </tr>
-
-        <!-- Group: Estimates & Consensus -->
-        <tr><td colspan="4" class="appendix-group">Estimates & Consensus</td></tr>
         <tr id="ref-N">
           <td class="ref-id">[N]</td>
-          <td>Consensus EPS — [Q# FY####]</td>
-          <td class="num">$[X.XX]</td>
-          <td class="source-detail">
-            <span class="excerpt">"Consensus EPS estimate of $X.XX, revised up from $X.XX over the past 90 days."</span><br>
-            <a href="https://[source-url-from-kensho-search]" target="_blank" class="src-url">[Source Title / Publication Name]</a><br>
-            <span class="src-label">Query:</span> search("[TICKER] earnings estimates consensus EPS revenue upcoming quarter")
-          </td>
-        </tr>
-
-        <!-- Group: News & Analyst Commentary -->
-        <tr><td colspan="4" class="appendix-group">News & Analyst Commentary</td></tr>
-        <tr id="ref-N">
-          <td class="ref-id">[N]</td>
-          <td>[e.g., "Barclays upgraded to Overweight"]</td>
+          <td>Verbatim source availability</td>
           <td class="num">N/A</td>
           <td class="source-detail">
-            <span class="excerpt">"Barclays upgraded WMT to Overweight with a $210 price target, citing accelerating eCommerce momentum."</span><br>
-            <a href="https://[source-url-from-kensho-search]" target="_blank" class="src-url">[Source Title / Publication, Date]</a><br>
-            <span class="src-label">Query:</span> search("[TICKER] analyst ratings price target upgrades downgrades")
+            <span class="excerpt">[IR transcript found | 8-K Ex-99.1 only | NONE].
+            If NONE, this report contains no blockquotes — the argument is made from the numbers.</span>
+          </td>
+        </tr>
+
+        <!-- Group: News & Events — every row carries a clickable filing-index or article URL. -->
+        <tr><td colspan="4" class="appendix-group">News &amp; Events</td></tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>[e.g., "Form 8-K Item 2.02 — results of operations, filed 2026-08-20"]</td>
+          <td class="num">N/A</td>
+          <td class="source-detail">
+            <span class="excerpt">"[key finding from the filing]"</span><br>
+            <a href="https://www.sec.gov/Archives/edgar/data/[cik]/[accession-no-dashes]/" target="_blank" class="src-url">[Filer Name, Form 8-K, filed YYYY-MM-DD]</a><br>
+            <span class="src-label">Query:</span> <code>efts.sec.gov/LATEST/search-index?q="[query]"&amp;forms=8-K&amp;ciks=[cik]</code>
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>[e.g., "Analyst action reported by Yahoo Finance"]</td>
+          <td class="num">N/A</td>
+          <td class="source-detail">
+            <span class="excerpt">"[action as reported]"</span><br>
+            <span class="src-label">yfinance</span> — <code>Ticker("[TICKER]").upgrades_downgrades</code>.
+            Yahoo-derived panel, <strong>not IBES</strong>; no source document and not reliably
+            timestamped. Unverifiable actions belong in Manual Review, not in the narrative.
+          </td>
+        </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>[Sector / macro context]</td>
+          <td class="num">N/A</td>
+          <td class="source-detail">
+            <span class="excerpt">"[finding]"</span><br>
+            <span class="src-label">FRED</span> series <code>[ID]</code>,
+            <code>fred.stlouisfed.org/graph/fredgraph.csv?id=[ID]</code>, retrieved [YYYY-MM-DD].
+            <span class="excerpt">Or: peer 8-K guidance language from EDGAR full-text search.</span>
           </td>
         </tr>
 
@@ -769,9 +960,74 @@ The report is a single self-contained HTML file with:
           <td class="num">[+/-X.X%]</td>
           <td class="source-detail">
             <span class="formula">(<a href="#ref-N" class="data-ref">Current $XXX.XX</a> - <a href="#ref-N" class="data-ref">Dec 31 Close $XXX.XX</a>) / <a href="#ref-N" class="data-ref">Dec 31 Close $XXX.XX</a> = X.X%</span><br>
-            <span class="src-label">S&P Capital IQ</span> (calculated from daily prices)
+            <span class="src-label">yfinance</span> EOD close (calculated). Common base date for
+            <strong>all</strong> tickers: [YYYY-MM-DD].
           </td>
         </tr>
+        <tr id="ref-N">
+          <td class="ref-id">[N]</td>
+          <td>1-Yr Return — [TICKER]</td>
+          <td class="num">[+/-X.X%]</td>
+          <td class="source-detail">
+            <span class="formula">(<a href="#ref-N" class="data-ref">End $XXX.XX</a> - <a href="#ref-N" class="data-ref">Base $XXX.XX</a>) / <a href="#ref-N" class="data-ref">Base $XXX.XX</a> = X.X%</span><br>
+            <span class="src-label">yfinance</span> EOD close (calculated), base date [YYYY-MM-DD]
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- TABLE 2: MANUAL REVIEW — MANDATORY. Never omit.          -->
+    <!-- One row per gap, exclusion, and unverifiable claim.      -->
+    <!-- ════════════════════════════════════════════ -->
+    <h3 class="subsection-title">Manual Review — items a human must resolve</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 210px;">Item</th>
+          <th style="width: 110px;">Status</th>
+          <th>Blocker</th>
+          <th style="width: 210px;">What a human must do</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>[e.g., Q4 FY2024 segment revenue y/y]</td>
+          <td><span class="neg">Not available</span></td>
+          <td>Prior-year segment member absent from companyfacts; filer does not tag it</td>
+          <td>Pull the segment footnote from the FY2024 10-K; do not estimate</td>
+        </tr>
+        <tr>
+          <td>[e.g., Q2 FY2024 surprise %]</td>
+          <td><span class="neg">Excluded</span></td>
+          <td><code>estimatedEPS</code> absent for that quarter in Alpha Vantage EARNINGS</td>
+          <td>Confirm against the original release; the quarter is out of every statistic</td>
+        </tr>
+        <tr>
+          <td>[e.g., Q1 FY2027 net revision breadth 7d]</td>
+          <td><span class="neg">Not available</span></td>
+          <td>Field returned <code>null</code> — treated as not reported, never as zero</td>
+          <td>None required; recorded so the reader knows breadth is absent, not neutral</td>
+        </tr>
+        <tr>
+          <td>[e.g., Firm-level rating change, [Broker], [date]]</td>
+          <td><span class="neg">Unverified</span></td>
+          <td>Yahoo Finance analyst actions carry no source document</td>
+          <td>Confirm with the broker note before this appears in any published research</td>
+        </tr>
+        <tr>
+          <td>[e.g., Management Q&amp;A themes]</td>
+          <td><span class="neg">Not available</span></td>
+          <td>No IR transcript and no 8-K Ex-99.1 for [fiscal period]</td>
+          <td>Obtain the call replay; report contains no blockquotes until then</td>
+        </tr>
+        <tr>
+          <td>[e.g., Peer NTM consensus coverage]</td>
+          <td><span class="neg">Depth limited</span></td>
+          <td>Alpha Vantage free tier is 25 req/day — subject only; peers are Yahoo-sourced</td>
+          <td>Label the basis (done); upgrade only with a paid IBES feed</td>
+        </tr>
+        <!-- Add one row per gap, exclusion, null and unverifiable claim found in any phase. -->
       </tbody>
     </table>
   </div>
