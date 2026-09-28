@@ -658,5 +658,3 @@ After completing a comp analysis, ask:
 The best comp analyses evolve with each iteration. Save templates, learn from feedback, and refine the structure based on what decision-makers actually use.
 
 - **Runbook:** [`references/runbook-comps.md`](references/runbook-comps.md) — the end-to-end walkthrough (which skills to load in what order, and the output contract).
-
-- **Runbook:** [`references/runbook-dcf.md`](references/runbook-dcf.md) — the end-to-end walkthrough (which skills to load in what order, and the output contract).

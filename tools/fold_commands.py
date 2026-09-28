@@ -74,9 +74,15 @@ def main() -> int:
         text = cmd.read_text(encoding="utf-8")
         name = cmd.stem
 
-        owner = next(
-            (g for m in SKILL_REF.finditer(text) for g in m.groups() if g), None
-        ) or ALIASES.get(name) or stem(name)
+        # Precedence: an explicit alias on the command NAME wins over a skill
+        # reference found in the body. A command's own name names its primary
+        # skill; the first `skill: "X"` it mentions is often just a sub-step
+        # (the /dcf runbook leads with comps-analysis but belongs to dcf-model).
+        owner = (
+            ALIASES.get(name)
+            or next((g for m in SKILL_REF.finditer(text) for g in m.groups() if g), None)
+            or stem(name)
+        )
 
         if owner not in skills:
             # Retry after normalizing the extracted reference too.

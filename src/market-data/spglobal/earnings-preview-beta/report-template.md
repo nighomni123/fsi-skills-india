@@ -109,6 +109,17 @@ The report is a single self-contained HTML file with:
       line-height: 1.5;
     }
 
+    /* ── Data Provenance Line ── */
+    .provenance {
+      font-size: 10.5px;
+      color: #444;
+      background: #f4f5f9;
+      border-left: 3px solid #1a1a4e;
+      padding: 5px 10px;
+      margin: 10px 0 4px 0;
+      line-height: 1.45;
+    }
+
     /* ── Section Headings ── */
     h2.section-title {
       font-size: 18px;
@@ -336,21 +347,33 @@ The report is a single self-contained HTML file with:
     <div class="date">[Full Date]</div>
   </div>
 
+  <!-- Data provenance: MANDATORY. Consensus basis + retrieval date + latency caveat. -->
+  <div class="provenance">
+    Consensus basis: <strong>[IBES via Alpha Vantage | Yahoo Finance analyst estimates via yfinance]</strong>
+    · Actuals: SEC EDGAR XBRL companyfacts (CIK [0000000000])
+    · Prices: yfinance EOD close · Retrieved: [YYYY-MM-DD]
+    · <strong>All prices and estimates are end-of-day or delayed — not real-time.</strong>
+  </div>
+
   <h1 class="report-title">[Company Name] ([TICKER]) [Q# FY####] Earnings Preview: [Thematic Subtitle]</h1>
 
   <div class="executive-summary">
-    <!-- Executive thesis: 2-3 short paragraphs + bullet points.
-         What we expect, our EPS estimate vs consensus, guidance expectations,
-         key metrics to watch, what would move the stock, key debates.
+    <!-- Executive thesis: 2-3 short paragraphs + bullet points, in THIS order.
+         1. Estimate revision  2. The bar  3. Consensus  4. Guidance
+         5. Key metric  6. Catalyst  7. Key debate
          Weave in 3-4 management quotes as blockquotes where they support the thesis.
-         Do NOT create a separate "Key Management Quotes" section. -->
+         Do NOT create a separate "Key Management Quotes" section.
+         If no verbatim source exists (no IR transcript, no 8-K Ex-99.1), there are NO
+         blockquotes — argue from the numbers instead. Never invent a quote. -->
 
-    <p>[Opening 1-2 sentences: what we expect from this print.]</p>
+    <p>[Opening 1-2 sentences: what we expect from this print, and why.]</p>
 
     <ul>
-      <li><strong>EPS:</strong> We estimate <a href="#ref-1" class="data-ref">$X.XX</a> vs consensus <a href="#ref-2" class="data-ref">$X.XX</a>, [rationale]</li>
-      <li><strong>Revenue:</strong> We estimate <a href="#ref-3" class="data-ref">$XX.XB</a> vs consensus <a href="#ref-4" class="data-ref">$XX.XB</a>, [rationale]</li>
-      <li><strong>Guidance:</strong> [What to expect on forward guidance]</li>
+      <li><strong>Estimate revision:</strong> 90-day EPS drift <a href="#ref-N" class="data-ref">[+/-X.X%]</a>, net 30-day revision breadth <a href="#ref-N" class="data-ref">[+/-N]</a>, dispersion <a href="#ref-N" class="data-ref">[XX.X%]</a> and narrowing/widening — [read]</li>
+      <li><strong>The bar:</strong> mean surprise <a href="#ref-N" class="data-ref">[+X.X%]</a> over the last <a href="#ref-N" class="data-ref">[N]</a> prints, σ <a href="#ref-N" class="data-ref">[X.X%]</a>, so the mean−1σ bar sits at <a href="#ref-N" class="data-ref">[+/-X.X%]</a> — [what that demands]</li>
+      <li><strong>Consensus:</strong> We estimate <a href="#ref-1" class="data-ref">$X.XX</a> vs consensus mean <a href="#ref-2" class="data-ref">$X.XX</a> (range <a href="#ref-3" class="data-ref">$X.XX–$X.XX</a>), [rationale]</li>
+      <li><strong>Revenue:</strong> We estimate <a href="#ref-4" class="data-ref">$XX.XB</a> vs consensus <a href="#ref-5" class="data-ref">$XX.XB</a>, [rationale]</li>
+      <li><strong>Guidance:</strong> [What to expect on forward guidance — only if a verbatim source exists]</li>
       <li><strong>Key metric:</strong> [Most important sub-headline metric to watch]</li>
       <li><strong>Stock catalyst:</strong> [What would move the stock up/down post-print]</li>
       <li><strong>Key debate:</strong> [What bulls and bears disagree on]</li>

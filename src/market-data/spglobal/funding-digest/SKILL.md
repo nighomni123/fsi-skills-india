@@ -376,7 +376,7 @@ failing index. Build the array in a file, not an inline string, so it stays re-r
            "headerFill":"1A1A1A","bodyFill":"F5F5F5","border.all":"1pt solid D0D0D0"}},
  {"command":"add","parent":"/slide[1]","type":"shape",
   "props":{"text":"Footer: US Reg D only · source: SEC EDGAR Form D · Generated 2026-09-28",
-           "x":"0cm","y":"18.0cm","w":"25.4cm","h":"0.8cm","color":"6B6B6B","size":8}}
+           "x":"0cm","y":"18.0cm","w":"25.4cm","h":"0.9cm","color":"6B6B6B","size":8}}
 ]
 ```
 
@@ -392,10 +392,11 @@ officecli add out/funding-digest.pptx /slide[1] --type picture \
 
 officecli add out/funding-digest.pptx /slide[1] --type shape \
   --prop text="EDGAR 0001079973-26-000147" --prop x=0.6cm --prop y=13.2cm \
-  --prop w=9cm --prop h=0.6cm --prop color=2B5797 --prop size=9
-# → "Added shape at /slide[1]/shape[@id=100006]"  ← target THIS path next
+  --prop w=9cm --prop h=0.7cm --prop color=2B5797 --prop size=9
+# → "Added shape at /slide[1]/shape[@id=100005]"  ← target THAT id next; it is assigned at
+#   add time and shifts with every other shape/picture/table you add, so never hardcode it.
 
-officecli add out/funding-digest.pptx '/slide[1]/shape[@id=100006]' --type hyperlink \
+officecli add out/funding-digest.pptx '/slide[1]/shape[@id=100005]' --type hyperlink \
   --prop link="https://www.sec.gov/Archives/edgar/data/1350102/000107997326000147/xslFormDX01/primary_doc.xml"
 ```
 

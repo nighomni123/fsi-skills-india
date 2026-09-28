@@ -1255,3 +1255,5 @@ Before delivering DCF model:
 - Terminal growth < WACC
 - Tax rate 21-28%
 - File naming: `[Ticker]_DCF_Model_[Date].xlsx`
+
+- **Runbook:** [`references/runbook-dcf.md`](references/runbook-dcf.md) — the end-to-end walkthrough (which skills to load in what order, and the output contract).
