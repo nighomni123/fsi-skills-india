@@ -7,27 +7,37 @@ This is the most narrative-driven tear sheet type. It reads like a briefing memo
 
 **Default page length:** 1-2 pages. No strict convention — prioritize readability over compression.
 
-## Query Plan
+## Data Plan
 
-Start with these queries. Follow up if results are incomplete.
+Retrieve in this order. Each step names the free endpoint. Follow up against the same endpoint if
+results are incomplete.
 
-**Query 1 — Company profile + financials:**
-"[Company] business description overview products services headquarters employees sector industry revenue gross margin last 2 fiscal years"
+**Step 1 — Company profile + financials:**
+`https://data.sec.gov/submissions/CIK##########.json` + the 10-K Item 1 Business (products, services) +
+`yfinance` `.info` (headquarters, employees, sector, industry) +
+`https://data.sec.gov/api/xbrl/companyconcept/CIK##########/us-gaap/<Tag>.json` for
+`RevenueFromContractWithCustomerExcludingAssessedTax` and `GrossProfit`, last 2 fiscal years,
+`form="10-K"`, `fp="FY"`.
 → Header, Company Overview, Financial Snapshot
 → **Immediately write** to `/tmp/tear-sheet/company-profile.txt`
 → **Immediately write** raw financials to `/tmp/tear-sheet/financials.csv`
 
-**Query 2 — Strategy + earnings:**
-"[Company] most recent earnings call strategic priorities CEO commentary guidance key initiatives"
+**Step 2 — Strategy + earnings:**
+The most recent 10-Q or the item 2.02 press-release exhibit from `submissions.json` (8-K), plus the
+MD&A and "strategic priorities" discussion in the latest 10-K. Guidance and key initiatives live there.
 → Strategic Priorities
 → **Immediately write** to `/tmp/tear-sheet/earnings.txt`
 
-**Query 3 — Relationships + news:**
-"[Company] key customers suppliers partners competitors business relationships recent acquisitions partnerships announcements"
+**Step 3 — Relationships + news:**
+Named customers, suppliers, partners, and competitors from the 10-K business description, risk factors,
+and concentration footnote. Recent M&A and partnerships from 8-K items 1.01 / 2.01 in
+`submissions.json`.
 → Key Relationships, Recent News
 → **Immediately write** to `/tmp/tear-sheet/relationships.txt`
 
-Three queries is usually sufficient. For well-known companies, these return rich results. For smaller or private companies, Queries 2 and 3 may be sparse — that's fine. The qualitative sections still deliver value because Claude synthesizes whatever is available into useful framing.
+Three steps is usually sufficient. For well-known companies these return rich results. For smaller or
+private companies, Steps 2 and 3 may be sparse — that's fine. The qualitative sections still deliver
+value because the analysis synthesizes whatever is available into useful framing.
 
 ## Sections
 
@@ -56,7 +66,7 @@ One horizontal band at the top. No enterprise value, no beta — this audience d
 ### 2. Company Overview
 The most important section. A sales rep should read this and walk into a meeting with a solid grasp of the prospect.
 
-**Do not paste the CIQ company summary.** It reads like an SEC filing and will lose a non-finance audience. Rewrite in 3-5 sentences of plain language:
+**Do not paste the 10-K business description.** It reads like an SEC filing and will lose a non-finance audience. Rewrite in 3-5 sentences of plain language:
 - What the company does (no investor jargon — say "sells" not "monetizes", say "yearly revenue" not "top-line CAGR")
 - Who their customers are
 - How they make money
@@ -76,7 +86,7 @@ What is leadership focused on right now? If you know what the CEO is talking abo
 
 Each bullet should answer: "What does this company care about right now, and what evidence supports it?" A sales rep should read these and immediately see angles to connect their product.
 
-If earnings call data isn't available (common for private companies), replace with "Recent Developments" pulling from whatever news or announcements the tools return.
+If earnings call data isn't available (common for private companies), replace with "Recent Developments" pulling from the 8-K filings and announcements returned by Step 3.
 
 ### 4. Financial Snapshot
 Simplified. Single compact table — just scale, direction, and one profitability signal. A sales rep needs to know three things: how big is this company, is it growing, and is it healthy.
@@ -131,12 +141,12 @@ If the user described what product/service they're selling, tailor these to conn
 
 **Validation test:** Before finalizing each conversation starter, verify it contains at least one specific number, date, product name, or initiative name drawn from the tear sheet. A question that could apply to any company in the sector is not a good conversation starter. "How are you thinking about AI?" is generic. "Your CEO mentioned $1B in AI investment since 2018 and 20% adoption of the iLEVEL auto-ingestion feature — how is that changing your analysts' workflows?" is specific and demonstrates preparation.
 
-This section is Claude's synthesis, not raw data from the tools. Label it clearly.
+This section is analysis, not raw data from a source. Label it clearly.
 
 ## Formatting Notes
 - **This should be the warmest, most readable tear sheet.** Rigorous content, but the formatting should feel like a briefing memo, not a data terminal.
-- Body text: use the full 9pt (size: 18). No compression — readability over density.
-- Line spacing: 1.15x on body paragraphs (slightly more generous than default). This template is the one where whitespace is a feature, not waste.
+- Body text: use the full `--prop size=9pt`. No compression — readability over density.
+- Line spacing: `--prop lineSpacing=1.15x` on body paragraphs (slightly more generous than default). This template is the one where whitespace is a feature, not waste.
 - Company Overview and Strategic Priorities should take ~40-50% of the page.
 - Financial Snapshot: visually compact, secondary prominence. Keep it small and clean.
 - Key Relationships: consider two-column layout (Customers + Vendors on left, Partners + Competitors on right) to save vertical space while keeping descriptors visible.

@@ -5,42 +5,54 @@ A target evaluation profile for an internal Corp Dev team assessing a potential 
 
 **Default page length:** 1-2 pages. Corp Dev teams are comfortable with denser profiles and won't penalize a second page if the content is substantive.
 
-## Query Plan
+## Data Plan
 
-Start with these queries. Break apart and follow up if results are incomplete.
+Retrieve in this order. Each step names the free endpoint. Break apart and follow up against the same
+endpoint if results are incomplete.
 
-**Query 1 — Target profile:**
-"[Company] business description products services technology platform headquarters founded employees sector industry"
+**Step 1 — Target profile:**
+`https://data.sec.gov/submissions/CIK##########.json` + the 10-K Item 1 Business (products, platform,
+technology) + `yfinance` `.info` (headquarters, employees, sector, industry, founded).
 → Header, Business & Product Overview
 → **Immediately write** to `/tmp/tear-sheet/company-profile.txt`
 
-**Query 2 — Financials:**
-"[Company] annual income statement revenue gross profit EBITDA operating income net income capex free cash flow R&D expense total debt cash and equivalents last 4 fiscal years"
-→ Financial Summary (pull 4 years; display 3; use the earliest year only for YoY growth computation. R&D is especially important for Corp Dev — they want to understand the target's investment in IP)
+**Step 2 — Financials:**
+`https://data.sec.gov/api/xbrl/companyconcept/CIK##########/us-gaap/<Tag>.json` per tag —
+`RevenueFromContractWithCustomerExcludingAssessedTax`, `GrossProfit`, `OperatingIncomeLoss`,
+`NetIncomeLoss`, **`ResearchAndDevelopmentExpense`** (especially important for Corp Dev — it shows the
+target's investment in IP), `NetCashProvidedByUsedInOperatingActivities`,
+`PaymentsToAcquirePropertyPlantAndEquipment`, `LongTermDebtNoncurrent` + `LongTermDebtCurrent`,
+`CashAndCashEquivalentsAtCarryingValue`. Filter to `form="10-K"`, `fp="FY"`.
+→ Financial Summary (pull 4 years; display 3; use the earliest year only for YoY growth computation)
 → **Immediately write** raw values to `/tmp/tear-sheet/financials.csv`
 
-**Query 3 — Segments + customers:**
-"[Company] revenue by segment business unit last 2 fiscal years key customers end markets customer concentration"
-→ Revenue Mix (need 2 years for YoY growth), Customer Analysis
+**Step 3 — Segments + customers:**
+The revenue tag read against its `segments` dimension in companyfacts, or the segment footnote in the
+10-K. Customer concentration from the 10-K concentration-of-risk disclosure. Need 2 years for YoY growth.
+→ Revenue Mix, Customer Analysis
 → **Immediately write** segment data to `/tmp/tear-sheet/segments.csv` (skip if no segment data returned)
 
-**Query 4 — Relationships + competitive landscape:**
-"[Company] key customers suppliers partners competitors business relationships technology vendors"
+**Step 4 — Relationships + competitive landscape:**
+Named counterparties from the 10-K business description, risk factors, and concentration footnote;
+competitors from the 10-K competition discussion. Technology vendors from the properties/technology
+disclosure in Item 1.
 → Strategic Fit Analysis, Ecosystem Map
 → **Immediately write** to `/tmp/tear-sheet/relationships.txt`
 
-**Query 5 — Valuation + peers:**
-If user provided specific comps:
-"[Comp company] enterprise value EV/Revenue EV/EBITDA revenue growth EBITDA margin"
-Otherwise:
-Use the competitors tool to identify 3-5 public peers, then pull EV/Revenue (NTM), EV/EBITDA (NTM), revenue growth %, and EBITDA margin % for each.
-Also: "[Company] enterprise value market capitalization valuation multiples"
+**Step 5 — Valuation + peers:**
+If the user provided specific comps, pull each explicitly — `yfinance` `.info` for market cap / EV, plus
+the same EDGAR tags for revenue and EBITDA.
+Otherwise derive 3-5 public peers from
+`https://data.sec.gov/api/xbrl/frames/us-gaap/Assets/CY2024Q4I.json`, screened by size and the
+sub-sector from Step 1, then pull EV/Revenue, EV/EBITDA, revenue growth %, and EBITDA margin % for each.
+Also: `yfinance` `.info` for the company's own market cap and enterprise value.
 → Valuation Context
 → **Immediately write** company multiples to `/tmp/tear-sheet/valuation.csv`
 → **Immediately write** peer data to `/tmp/tear-sheet/peer-comps.csv`
 
-**Query 6 — Ownership (data permitting):**
-"[Company] ownership structure investors institutional ownership insider ownership"
+**Step 6 — Ownership (data permitting):**
+`yfinance` `.institutional_holders`, plus the proxy statement / DEF 14A ownership tables from
+`submissions.json`.
 → Ownership snapshot (no intermediate file — included in company-profile.txt if available)
 
 ## Sections
@@ -63,7 +75,7 @@ Similar to IB/M&A but adds a "Strategic Relevance" tagline.
 The "Strategic Relevance" line is unique to Corp Dev. Write from a neutral analytical perspective, not from the target's marketing language. Frame what an acquirer *gets* — not what the target *is*. Good: "Dominant position in commodity price benchmarks with regulatory moat and 70%+ gross margins — a capital-light, high-barrier data asset." Bad: "The world's leading provider of financial data and analytics." The former tells a corp dev team why this is attractive; the latter is a press release.
 
 ### 2. Business & Product Overview
-**Do not paste the CIQ company summary.** Rewrite in 4-6 sentences (one paragraph, not two) with a product and technology focus — this audience evaluates acquisitions, not investments:
+**Do not paste the 10-K business description.** Rewrite in 4-6 sentences (one paragraph, not two) with a product and technology focus — this audience evaluates acquisitions, not investments:
 - Core products/services and what problem they solve
 - Technology or platform architecture (at a high level)
 - Key differentiators and competitive moat
@@ -87,10 +99,10 @@ Below the segment table (or in place of it if segments aren't available), write 
 - Contract structure: subscription vs. transactional vs. license (if known)
 - Geographic mix
 
-Customer concentration is the single most important signal here — if the tools return any data on top customers or revenue concentration, highlight it prominently. If data is sparse, write what you can infer from the business description and relationships. Keep this to 2-3 sentences — it's context for the segment table, not a standalone analysis.
+Customer concentration is the single most important signal here — if the 10-K concentration-of-risk disclosure or another source names top customers, highlight it prominently. If data is sparse, write what you can infer from the business description and relationships. Keep this to 2-3 sentences — it's context for the segment table, not a standalone analysis.
 
 ### 4. Strategic Fit Analysis
-**This is the signature section of the Corp Dev tear sheet.** It is required — do not skip or compress it. It uses the Business Relationships data from S&P Capital IQ to map overlaps and complements.
+**This is the signature section of the Corp Dev tear sheet.** It is required — do not skip or compress it. It uses the Business Relationships data from the 10-K and its concentration footnote to map overlaps and complements.
 
 Organize as three buckets. **Each bucket must be 2-3 sentences of analytical reasoning, not a list of company names.** Listing "Customers: Microsoft, JPMorgan, Google" without context is useless. Instead, explain *what the overlap or complement means* for an acquisition.
 
@@ -134,13 +146,13 @@ R&D intensity signals how much of the target's value is in IP vs. services. FCF 
 Frame for acquisition context: below the table, include one sentence interpreting leverage (e.g., "Net debt of $X represents Y.Yx EBITDA leverage, which is manageable for an investment-grade acquirer but would compound leverage in an LBO scenario."). Pull from the balance sheet data already retrieved.
 
 ### 6. Valuation Context
-**This section is required for public companies.** Corp Dev teams need market context to frame a potential bid. If the tools return valuation multiples, this section must appear. Do not cut it for space — cut Ownership Snapshot (Section 7) first.
+**This section is required for public companies.** Corp Dev teams need market context to frame a potential bid. If valuation multiples can be derived from the retrieved data, this section must appear. Do not cut it for space — cut Ownership Snapshot (Section 7) first.
 
 Not a formal valuation — Corp Dev teams do their own DCFs. This provides market context.
 
 **a) Trading multiples** (if public):
 
-**Peer context is essential, not optional.** If the user provided comps, show each in its own column. If no comps were provided, use the competitors tool to identify 3-5 public peers, then pull EV/Revenue (NTM), EV/EBITDA (NTM), revenue growth %, and EBITDA margin % for each.
+**Peer context is essential, not optional.** If the user provided comps, show each in its own column. If no comps were provided, derive 3-5 public peers from the EDGAR `frames` screen, then pull EV/Revenue, EV/EBITDA, revenue growth %, and EBITDA margin % for each.
 
 | Metric | [Company] | [Peer 1] | [Peer 2] | [Peer 3] | Peer Median |
 |---|---|---|---|---|---|
@@ -151,7 +163,7 @@ Not a formal valuation — Corp Dev teams do their own DCFs. This provides marke
 
 A company's multiples in isolation tell a corp dev team nothing — they need relative context to assess whether the target is cheap or rich vs. the peer set. This is the minimum viable valuation context for a target profile.
 
-If peer multiples are unavailable from the tools, show the company's own multiples and list selected peer names below the table for the reader's reference.
+If peer multiples are unavailable from the sources, show the company's own multiples and list selected peer names below the table for the reader's reference.
 
 **b) Precedent transactions (data permitting):**
 If the M&A tools return recent transactions involving the company's peers or within the same sub-sector, display them:
@@ -161,14 +173,14 @@ If the M&A tools return recent transactions involving the company's peers or wit
 
 Frame as context: "Recent transactions in [sub-sector] have valued targets at X–Yx revenue."
 
-If precedent transaction data is not available from the tools, note "Precedent transaction data not available from data source" rather than omitting silently. Do not fabricate precedent multiples.
+If precedent transaction data cannot be found, note "Precedent transaction data not available from data source" rather than omitting silently. Do not fabricate precedent multiples.
 
 For private companies, skip trading multiples. Precedent transactions (data permitting) are still useful.
 
 ### 7. Ownership Snapshot (data permitting — omit if tools return nothing)
-If the tools return ownership data, include a compact block: founder/family control %, PE sponsor details, institutional concentration. Ownership structure directly impacts deal complexity and is relevant for integration considerations.
+If `yfinance` `.institutional_holders` or the proxy statement returns ownership data, include a compact block: founder/family control %, PE sponsor details, institutional concentration. Ownership structure directly impacts deal complexity and is relevant for integration considerations.
 
-**Do not include a Management Team table.** No S&P Global tool returns executive data — see Data Integrity Rule 10. Management names from training data will be stale.
+**Do not include a Management Team table.** No free source reliably returns executive data — see Data Integrity Rule 10. Management names from training data will be stale.
 
 ### 8. Integration Considerations
 **Required section — do not cut.** This is the analytical capstone of the Corp Dev tear sheet. Synthesized observations drawn from everything above. 3-4 substantive bullets:
@@ -194,9 +206,9 @@ Never cut: Business & Product Overview (2), Financial Summary (5 core table), In
 
 ## Formatting Notes
 - **Strategic Fit Analysis is the centerpiece.** Give it distinctive formatting:
-  - Bump text to 9.5pt (size: 19) — slightly larger than standard body text. This section should look like the most important content on the page.
-  - Use the standard indented block-style bullets from the global style config (360 DXA left indent).
-  - Do not apply left-border accents — they render inconsistently in docx-js.
+  - Bump text to `--prop size=9.5pt` — slightly larger than standard body text. This section should look like the most important content on the page.
+  - Use the standard indented block-style bullets from the global style config (`--prop indent=360 --prop hangingIndent=180`).
+  - Do not apply left-border accents — indentation and size carry the distinction.
 - Financial Summary should include R&D and FCF conversion prominently.
 - Valuation Context with peer comps is required for public companies — do not cut before Ownership Snapshot.
 - For private targets, the profile leans heavily on qualitative sections (Business Overview, Strategic Fit, Relationships) — this is expected and still highly valuable.

@@ -5,43 +5,61 @@ A company profile for transaction context — potential target, acquirer, or pit
 
 **Default page length:** 1-2 pages. IB company profiles routinely spill to a second page, especially when segment and M&A data is rich.
 
-## Query Plan
+## Data Plan
 
-Start with these queries. Break apart and follow up if results are incomplete.
+Retrieve in this order. Each step names the free endpoint. Break apart and follow up against the same
+endpoint if results are incomplete.
 
-**Query 1 — Profile + identification:**
-"[Company] business description headquarters founded employees sector industry ownership structure major shareholders"
+**Step 1 — Profile + identification:**
+`https://data.sec.gov/submissions/CIK##########.json` (identity, exchange, fiscal year end, filing
+history) + `yfinance` `.info` (headquarters, employees, sector, industry) + the business description and
+major shareholders from the latest 10-K cover page and proxy.
 → Header, Business Overview
 → **Immediately write** to `/tmp/tear-sheet/company-profile.txt`
 
-**Query 2 — Segments + financials:**
-"[Company] revenue by segment business unit last 2 fiscal years AND annual income statement revenue gross profit EBITDA operating income net income capex free cash flow total debt cash and equivalents last 4 fiscal years"
-→ Segment Breakdown (need 2 years to compute YoY growth), Financial Summary (pull 4 years; display 3; use the earliest year only for YoY growth computation)
+**Step 2 — Financials:**
+`https://data.sec.gov/api/xbrl/companyconcept/CIK##########/us-gaap/<Tag>.json` per tag —
+`RevenueFromContractWithCustomerExcludingAssessedTax`, `GrossProfit`, `OperatingIncomeLoss`,
+`NetIncomeLoss`, `NetCashProvidedByUsedInOperatingActivities`,
+`PaymentsToAcquirePropertyPlantAndEquipment`, `LongTermDebtNoncurrent` + `LongTermDebtCurrent`,
+`CashAndCashEquivalentsAtCarryingValue`. Filter to `form="10-K"`, `fp="FY"`.
+→ Financial Summary (pull 4 years; display 3; use the earliest year only for YoY growth computation)
 → **Immediately write** raw financials to `/tmp/tear-sheet/financials.csv`
+
+**Step 2b — Segments:**
+The revenue tag read against its `segments` dimension in companyfacts, or the segment footnote in the
+10-K. Need 2 years to compute YoY growth.
+→ Segment Breakdown
 → **Immediately write** segment data to `/tmp/tear-sheet/segments.csv` (skip if no segment data returned)
 
-**Query 3 — Valuation + comps:**
-If the user provided specific comparable companies, query each:
-"[Comp company] enterprise value EV/Revenue EV/EBITDA revenue growth EBITDA margin"
-Otherwise:
-Use the competitors tool to identify 3-5 public peers, then pull EV/Revenue (NTM), EV/EBITDA (NTM), revenue growth %, and EBITDA margin % for each.
-Also: "[Company] enterprise value market capitalization EV/Revenue EV/EBITDA valuation multiples"
+**Step 3 — Valuation + comps:**
+If the user provided specific comparable companies, pull each explicitly — `yfinance` `.info` for
+market cap / EV, plus the same EDGAR tags for revenue and EBITDA.
+Otherwise derive 3-5 public peers from
+`https://data.sec.gov/api/xbrl/frames/us-gaap/Assets/CY2024Q4I.json`, screened by size and the industry
+identified in Step 1, then pull EV/Revenue, EV/EBITDA, revenue growth %, and EBITDA margin % for each.
+Also: `yfinance` `.info` for the company's own market cap and enterprise value.
 → Header (EV/market cap), Trading Comps
 → **Immediately write** company multiples to `/tmp/tear-sheet/valuation.csv`
 → **Immediately write** peer data to `/tmp/tear-sheet/peer-comps.csv`
 
-**Query 4 — M&A activity:**
-"[Company] acquisitions divestitures completed transactions last 5 years deal value"
+**Step 4 — M&A activity:**
+The company's own 8-K filings from `submissions.json` (item 1.01 / 2.01) and the business-combination
+footnote in each 10-K. Deal values come from those filings and the counterparty's own announcement.
 → Company's own deals
 → **Immediately write** to `/tmp/tear-sheet/ma-activity.csv`
 
-**Query 5 — Comparable transactions (data permitting):**
-Use the specific industry from Query 1 results (e.g., "cloud observability software M&A transactions" not "technology M&A"). If the user specified comps, also try: "[comp company] acquisition deal multiples."
+**Step 5 — Comparable transactions (data permitting):**
+No free structured precedent-transaction database exists. Search the web / company press releases for
+transactions in the **specific** sub-sector from Step 1 (e.g. "cloud observability software
+acquisition" not "technology M&A"). If the user specified comps, search those companies by name.
 → Comparable Transactions
-→ **Append** comparable transactions to `/tmp/tear-sheet/ma-activity.csv` (add `type=precedent` to distinguish from company's own deals)
+→ **Append** to `/tmp/tear-sheet/ma-activity.csv` with `type=precedent`
+→ **If you cannot find a disclosed value, write "Not available" — never invent a precedent multiple.**
 
-**Query 6 — Relationships + ownership:**
-"[Company] key customers suppliers partners business relationships institutional ownership insider ownership"
+**Step 6 — Relationships + ownership:**
+Customer/supplier concentration from the 10-K concentration footnote; named counterparties from the
+business description and risk factors. Institutional holders from `yfinance` `.institutional_holders`.
 → Business Relationships, Ownership (data permitting)
 → **Immediately write** to `/tmp/tear-sheet/relationships.txt`
 
@@ -66,7 +84,7 @@ Key-value block with transaction-relevant identifiers.
 For private companies: note "Private Company" prominently; skip ticker, exchange.
 
 ### 2. Business Overview
-**This is a pitchbook paragraph, not a CIQ summary.** Do not paste the company description from the data tools. Rewrite in 4-6 sentences using pitchbook prose:
+**This is a pitchbook paragraph, not a filing summary.** Do not paste the company description out of the 10-K. Rewrite in 4-6 sentences using pitchbook prose:
 - Characterize the revenue model (recurring vs. transactional, subscription vs. license)
 - Name the customer base at scale ("serves 80% of Fortune 500 banks")
 - Identify competitive moats by name ("proprietary dataset of X", "only provider with Y")
@@ -112,16 +130,16 @@ In M&A context, margins and FCF conversion matter as much as absolute scale — 
 | Cash & Equivalents | $XXM |
 | Net Debt | $XXM |
 | Net Debt / EBITDA | X.Xx |
-| S&P Credit Rating | XX (if available) |
+| Credit Rating | XX (if disclosed in the 10-K debt footnote; **no free rating source** — omit otherwise) |
 
 Pull from the balance sheet data already retrieved. This is standard in any banker's company profile — total debt, leverage ratio, and credit rating tell a buyer what the financing picture looks like. If credit rating is unavailable, omit that row.
 
 ### 5. Trading Comps
 Company multiples **and operating metrics** — bankers use these together, not multiples in isolation.
 
-**Forward multiples are mandatory when available.** The table must include NTM multiples if the tools return them. Showing only trailing multiples when forward data exists is a significant gap — bankers price deals on forward earnings.
+**Forward multiples are mandatory when available.** The table must include NTM multiples when they can be derived from consensus estimates. Showing only trailing multiples when forward data exists is a significant gap — bankers price deals on forward earnings.
 
-**Peer columns are expected.** If the user provided comps, each gets its own column. If not, use the competitors tool to identify 3-5 public peers, pull their multiples and operating metrics, and include them. A company-only trading comps table without peer context is incomplete for any banking use case.
+**Peer columns are expected.** If the user provided comps, each gets its own column. If not, derive 3-5 public peers from the EDGAR `frames` screen, pull their multiples and operating metrics, and include them. A company-only trading comps table without peer context is incomplete for any banking use case.
 
 | Metric | [Company] | [Comp 1] | [Comp 2] | [Comp 3] | Peer Median |
 |---|---|---|---|---|---|
@@ -137,7 +155,7 @@ For private companies, skip this section.
 ### 6. M&A Activity
 Two parts. **Deal values are expected in this section** — bankers notice when they're missing.
 
-**Hard rule: If the M&A tools return a transaction value, it must appear in the output.** Never downgrade a known deal value to "Undisclosed" — this is a data integrity violation. Use "Undisclosed" only when the tools genuinely return no value for a transaction.
+**Hard rule: If an 8-K, business-combination footnote, or counterparty announcement returns a transaction value, it must appear in the output.** Never downgrade a known deal value to "Undisclosed" — this is a data integrity violation. Use "Undisclosed" only when no source genuinely discloses a value for a transaction.
 
 **a) Company's Own Transactions:**
 
@@ -155,10 +173,10 @@ Use the specific industry identified earlier (e.g., "cloud infrastructure softwa
 | Date | Target | Acquirer | EV ($M) | EV/Rev | EV/EBITDA |
 |---|---|---|---|---|---|
 
-If not available from the tools: "Comparable transaction data not available from data source." Do not fabricate precedent multiples.
+If not found: "Comparable transaction data not available from data source." Do not fabricate precedent multiples.
 
 ### 7. Key Business Relationships
-Leverages S&P Capital IQ relationship data. Group by type:
+Draws on the 10-K customer/supplier concentration footnote, business description, and risk factors. Group by type:
 
 **Customers:** Top 3-5 named clients
 **Suppliers:** Key vendors and technology providers
@@ -168,16 +186,16 @@ Leverages S&P Capital IQ relationship data. Group by type:
 For each entry, include the relationship type and a parenthetical descriptor explaining the nature of the relationship (e.g., "AWS — cloud infrastructure (primary hosting provider)", "JPMorgan — customer (enterprise analytics platform)"). A name alone without context isn't useful. Give this section breathing room — it's strategically valuable and most competing tear sheets lack it.
 
 ### 8. Ownership Snapshot (data permitting — omit if tools return nothing)
-If the tools return institutional ownership, insider ownership percentage, or top holders, include a compact block:
+If `yfinance` `.institutional_holders` or the proxy statement returns institutional ownership, insider ownership percentage, or top holders, include a compact block:
 
 Top institutional holders (if available): list top 3-5 by ownership %.
 Insider ownership: aggregate percentage.
 
 For PE-backed companies, name the sponsor, acquisition year, and ownership stake. Ownership structure directly affects deal complexity — a widely held public company, a founder-controlled company, and a PE-backed company each require fundamentally different deal approaches.
 
-If ownership data is not returned by the tools, omit this section entirely rather than showing placeholders.
+If ownership data is not returned by the sources, omit this section entirely rather than showing placeholders.
 
-**Do not include a Management Team table.** No S&P Global tool returns executive data — see Data Integrity Rule 10. Management names from training data will be stale.
+**Do not include a Management Team table.** No free source reliably returns executive data — see Data Integrity Rule 10. Management names from training data will be stale.
 
 ## Page Budget & Cut Order
 

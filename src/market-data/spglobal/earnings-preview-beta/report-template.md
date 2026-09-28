@@ -637,6 +637,24 @@ The report is a single self-contained HTML file with:
       peers — these are different contributor pools and the comparison is not strictly like-for-like.</strong></div>
   </div>
 
+  <div class="page-break">
+
+    <!-- Figure 9: Estimate Revisions — DELETE THIS FIGURE if fewer than two near-term quarters have
+         usable revision data. Never chart a null as zero, and never chart far-dated quarters: on
+         those the 7/30-day-ago averages simply equal the current average because the panel has not
+         formed, so the "drift" is structurally zero and meaningless. -->
+    <div class="chart-row">
+      <div class="chart-container chart-full">
+        <h4 class="figure-title">Figure 9: Estimate Revisions — 90-Day Drift vs. Net 30-Day Revision Breadth</h4>
+        <canvas id="chart-revisions" style="max-height: 300px;"></canvas>
+        <div class="source">Source: Alpha Vantage <code>EARNINGS_ESTIMATES</code> (IBES-sourced), near-term
+          fiscal quarters only, retrieved [YYYY-MM-DD]. Drift = (avg − avg_90_days_ago) ÷ |avg_90_days_ago|.
+          Net breadth = up_trailing_30_days − down_trailing_30_days, with <code>null</code> excluded, never
+          read as zero.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ════════════════════════════════════════════ -->
   <!-- APPENDIX: DATA SOURCES & CALCULATIONS        -->
   <!-- ════════════════════════════════════════════ -->
@@ -1037,7 +1055,7 @@ The report is a single self-contained HTML file with:
   <!-- ════════════════════════════════════════════ -->
   <div class="page-footer">
     <div class="footer-disclaimer">Analysis is AI-generated — please confirm all outputs</div>
-    <div class="footer-meta">Data: S&P Capital IQ, Kensho | [Month Day, Year]</div>
+    <div class="footer-meta">Data: Alpha Vantage EARNINGS_ESTIMATES / EARNINGS (IBES, subject only) · SEC EDGAR XBRL companyfacts · yfinance EOD close | [Month Day, Year] · <strong>EOD / delayed — not real-time</strong></div>
   </div>
 
 </div>
@@ -1338,6 +1356,63 @@ function createPEChart(canvasId, companies) {
   });
 }
 
+// ── Helper: Estimate Revisions (Figure 9) ──
+// driftPct: 90-day EPS estimate drift, in percent, per near-term quarter
+// breadth:   net 30-day revision breadth (up - down), same quarters, same order
+// Pass only quarters where BOTH series have usable (non-null) data. A null is
+// excluded by the caller, never coerced to 0 — a zero breadth claim is a claim.
+function createRevisionChart(canvasId, labels, driftPct, breadth) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  new Chart(ctx, {
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'EPS Revision Drift, 90d %',
+          data: driftPct,
+          backgroundColor: driftPct.map(v => v >= 0 ? COLORS.green + 'cc' : COLORS.red + 'cc'),
+          borderColor: driftPct.map(v => v >= 0 ? COLORS.green : COLORS.red),
+          borderWidth: 1,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          type: 'line',
+          label: 'Net Revision Breadth, 30d (up − down)',
+          data: breadth,
+          borderColor: COLORS.navy,
+          backgroundColor: COLORS.navy,
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointBackgroundColor: COLORS.navy,
+          tension: 0.3,
+          yAxisID: 'y1',
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: {
+          position: 'left',
+          title: { display: true, text: 'Drift (%)', font: { size: 11 } },
+          grid: { color: '#eee' },
+          ticks: { callback: v => v.toFixed(1) + '%' }
+        },
+        y1: {
+          position: 'right',
+          title: { display: true, text: 'Net breadth (analysts)', font: { size: 11 } },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
 // ═══════════════════════════════════════════════
 // HELPER FUNCTIONS DEFINED ABOVE — DO NOT REWRITE THEM.
 // Use ONLY these functions to create charts.
@@ -1426,6 +1501,18 @@ try {
 } catch(e) { console.error('Figure 7 error:', e); }
 </script>
 
+<!-- Figure 9: Estimate Revisions — near-term quarters only, both series non-null.
+     DELETE this script and its <canvas> if fewer than two quarters qualify. -->
+<script>
+try {
+  createRevisionChart('chart-revisions',
+    ['Q4 FY26','Q1 FY27','Q2 FY27'],   // near-term fiscal quarters only
+    [2.7, 1.9, 0.8],                    // 90-day EPS estimate drift, %
+    [7, 4, 2]                           // net 30-day revision breadth (up - down)
+  );
+} catch(e) { console.error('Figure 9 error:', e); }
+</script>
+
 </body>
 </html>
 ```
@@ -1478,10 +1565,13 @@ try {
 - **Sorted**: Descending by P/E
 - Shows at a glance whether the company trades at a premium or discount to peers
 
-### Figure 8: Competitor Comparison Table
-- HTML table with highlight-row for subject company
-- Columns: Ticker | Company | Mkt Cap ($B) | LTM P/E | NTM P/E | YTD % | 1-Yr %
-- Color-code returns with pos/neg classes
+### Figure 9: Estimate Revisions Chart
+- **Type**: Dual-axis — 90-day EPS estimate drift as bars (left axis, %), net 30-day revision breadth as a line (right axis, count of analysts)
+- **Bars**: Green for positive drift, red for negative — mechanical, never interpretive
+- **Quarters**: near-term only. On far-dated quarters the 7/30-day-ago averages equal the current average because the panel has not formed, so drift is structurally zero and says nothing about the Street's view
+- **Nulls are excluded, never zero-filled.** A `null` revision count means "not reported", and charting it as 0 fabricates neutral breadth
+- **Delete the figure entirely** if fewer than two quarters have usable data in both series. A two-bar chart of real data beats a six-bar chart with four invented points
+- **No revenue revision series exists** — `revenue_estimate_*` carries no 7/30/60/90-day history. Do not construct one
 
 ## Formatting Conventions
 
@@ -1489,7 +1579,9 @@ try {
 - Revenue: 1 decimal place for $B (e.g., "$152.3B"), no decimals for $M (e.g., "$4,521M")
 - EPS: 2 decimal places (e.g., "$1.47")
 - Margins: 1 decimal place with % sign (e.g., "24.5%")
-- Growth rates: 1 decimal place with +/- sign (e.g., "+5.2%", "-3.1%")
+- Growth rates, revision drift, surprise %: 1 decimal place with +/- sign (e.g., "+5.2%", "-3.1%")
+- Estimate dispersion: 1 decimal place (e.g., "8.4%")
+- Net revision breadth: signed integer (e.g., "+7")
 - Market cap: 1 decimal place for $B (e.g., "$562.1B")
 - Stock prices: 2 decimal places (e.g., "$172.35")
 - P/E ratios: 1 decimal place with 'x' suffix (e.g., "25.3x")
@@ -1497,41 +1589,71 @@ try {
 ### Color Coding
 - Positive values: `class="pos"` -- green (#0d7a3e)
 - Negative values: `class="neg"` -- red (#c0392b)
-- Neutral/flat: `class="neutral"` -- gray (#555)
+- Neutral/flat/unavailable: `class="neutral"` -- gray (#555)
 - Subject company row: `class="highlight-row"` -- light blue background
+- Consensus basis tag: `<span class="basis">IBES</span>` or `<span class="basis">YAHOO</span>`
+- Color follows the **sign**, never the interpretation. A −1.1% is always red, however small
 
 ### Figure Labels
 - Number all figures sequentially: "Figure 1:", "Figure 2:", etc.
-- Figures 1-8 are on Pages 3-5 (the Consensus Estimates table on Page 2 is not numbered)
-- Include source attribution under every chart and table: "Source: S&P Capital IQ"
+- Figures A and B (Consensus & Revisions, Surprise History) sit on Page 2 and are lettered, not numbered; Figures 1–9 sit on Pages 3–5
+- **Include source attribution under every chart and table**, naming the actual endpoint — not a generic vendor label
 
-### Hyperlinked Claims
-- Every factual claim in the report body — numbers AND qualitative statements — must be wrapped in `<a href="#ref-N" class="data-ref">CLAIM TEXT</a>`
-- The `ref-N` ID must match a row in the Appendix table
-- This applies to: narrative text, bullet points, table cells, blockquotes — anywhere a fact appears
-- Chart axis labels and tooltips do NOT need hyperlinks (only report body text)
-- Assign reference IDs sequentially (`ref-1`, `ref-2`, ...) as you write the report
-- Multiple references to the same underlying claim should share the same ref ID
-- For qualitative claims, wrap the key phrase: `<a href="#ref-25" class="data-ref">management flagged tariff headwinds</a>`
+## Data-Sourcing Rules (free stack)
+
+These are the source strings the report is allowed to print. Anything else is a defect.
+
+| Figure / table | Required source attribution |
+|---|---|
+| Figures A, 9 | Alpha Vantage `EARNINGS_ESTIMATES` (IBES-sourced), retrieved [date] |
+| Figure B | Alpha Vantage `EARNINGS`; 1-day moves from yfinance EOD closes |
+| Figures 1, 2, 3 | SEC EDGAR XBRL `companyfacts`, CIK [CIK], retrieved [date] |
+| Figure 4 | XBRL segment members or the 10-Q/10-K segment footnote — name which. **Delete the figure if unavailable** |
+| Figures 5, 6, 7 | yfinance `history(period="1y").Close` — EOD, not real-time |
+| Figure 7 | SEC EDGAR XBRL EPS (subject) / company filings or yfinance (peers) |
+| Figure 8 | yfinance market cap and EOD closes; Alpha Vantage `EARNINGS_ESTIMATES` (subject NTM, IBES); yfinance `earnings_estimate` (peer NTM, **Yahoo, not IBES**) |
+| News & Events | EDGAR full-text search `efts.sec.gov/LATEST/search-index?q=…&forms=8-K&ciks=…` + clickable `sec.gov/Archives/edgar/data/…` filing-index URL |
+| Analyst actions | yfinance `upgrades_downgrades` / `analyst_price_targets` — labelled "Yahoo Finance analyst estimates", never "the Street" |
+| Macro / sector | FRED keyless CSV with the series id (`fred.stlouisfed.org/graph/fredgraph.csv?id=[ID]`) or peer 8-K language |
+
+### Honesty rules that apply to the rendered report
+
+- **Never fabricate an estimate or an actual.** If a figure is unavailable, write
+  `not available — [blocker]` and add a Manual Review row. Do not fill the hole.
+- **Consensus basis travels with the number.** IBES (Alpha Vantage, subject) and Yahoo Finance
+  (peers) are different products. Tag every consensus figure. Never put them in one unlabelled column.
+- **Everything is EOD or delayed.** The header provenance line and the footer both say so. No figure,
+  price, or estimate may be described as real-time or intraday.
+- **Alpha Vantage's free tier is 25 requests/day — subject company only.** Peer consensus is
+  Yahoo-sourced; say so wherever a peer multiple appears.
+- **No verbatim source, no blockquote.** Without an IR transcript or an 8-K Exhibit 99.1, the report
+  contains no `<blockquote>` elements at all. Never present a paraphrase as a quote.
+- **`null` is not zero.** An absent revision count or an absent estimate is an absence, excluded from
+  every statistic and named in Manual Review — not a neutral value.
+- **A `not available` in the report is a feature.** The Manual Review table is the deliverable's
+  honesty floor.
 
 ### Appendix
+
 - **MUST begin with**: `<div class="ai-disclaimer">Analysis is AI-generated — please confirm all outputs</div>`
-- The Appendix is the final section of the report, after all figures
-- **4 columns**: Ref # | Fact | Value | Source & Derivation
-- One row per unique claim referenced in the report (numeric and non-numeric)
-- **Every number in the report body must be a clickable `<a href="#ref-N">` link to its appendix row. No exceptions.**
-- Group rows by category: Quarterly Financials, Valuation, Transcript Claims, Estimates & Consensus, News & Analyst Commentary, Stock Performance
-- Use subheading rows (`appendix-group` class) to separate groups
-- **Source & Derivation column** must include specific, detailed sourcing for EVERY row:
-  - For raw S&P data (revenue, EPS, prices, market cap, etc.): `<span class="src-label">S&P Capital IQ</span>` followed by the specific MCP function call with parameters (e.g., `get_financial_line_item_from_identifiers(identifier='WMT', line_item='revenue', period_type='quarterly', period='Q3 FY2026')`). **Never write just "S&P Capital IQ" with no detail.**
-  - For calculated values (margins, growth rates, P/E, returns): the full formula with `<a class="data-ref">` hyperlinks to each component row (use `formula` CSS class). **Every number in the formula must be a clickable link to its own appendix row.**
-  - For transcript claims: the verbatim excerpt sentence in italics (`excerpt` CSS class) + transcript name with `transcript-ref` class + `key_dev_id`
-  - For Kensho results: the key finding (`excerpt` class) + **clickable source URL** as `<a href="[URL]" target="_blank" class="src-url">[Source Title]</a>` + the search query used. **Every Kensho-sourced claim must have a clickable URL to the original source.**
-- Source labels use the `src-label` CSS class (bold navy)
-- External source URLs use the `src-url` CSS class (blue, underlined, clickable)
+  followed by the provenance line (consensus basis, CIK, retrieval date, EOD caveat, AV quota).
+- **Table 1 — Sources & Calculations.** Columns: Ref # | Fact | Value | Source & Derivation. One row
+  per unique claim, `id="ref-N"`, grouped under `appendix-group` subheadings: Quarterly Financials ·
+  Estimates, Consensus & Revisions · Surprise History · Valuation · Transcript & Management
+  Commentary · News & Events · Stock Performance.
+- **Table 2 — Manual Review.** Columns: Item | Status | Blocker | What a human must do. **Mandatory and
+  never omitted.** One row per gap, exclusion, null and unverifiable claim found in any phase.
+- Every raw-data row cites the endpoint with its identifying detail — EDGAR tag + frame + form +
+  accession + filing date; AV function + symbol + horizon + period + field + retrieval date; yfinance
+  attribute. **A bare label like "SEC EDGAR" with no tag and no accession is a defect.**
+- Every calculated row shows the full formula with **each component hyperlinked** to its own appendix
+  row, so the reader can click from the result back to each input.
+- Every news/event row carries a clickable `sec.gov/Archives/edgar/data/…` filing-index URL.
+- Delete the Transcript group entirely when no verbatim source exists.
+- Use 10–11px.
 
 ### Style Rules
 - **NO EMOJIS** anywhere in the report. No emoji in headings, tables, chart labels, or body text. This is a professional research document.
 - Font: Arial Narrow throughout (body, headings, tables, charts).
-- Management quotes: Integrate as `<blockquote>` elements within the executive thesis narrative. Never under a separate heading.
+- Management quotes: integrate as `<blockquote>` elements within the executive thesis narrative. Never under a separate heading. Only if a verbatim source exists.
 - Keep all text concise. Target 4-5 printed pages total (appendix is additional).

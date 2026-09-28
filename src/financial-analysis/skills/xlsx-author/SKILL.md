@@ -143,12 +143,17 @@ Minimum checks by model type:
 
 ```json
 {"command":"add","parent":"/DCF","type":"chart",
- "props":{"dataRange":"DCF!A2:C7","type":"line","anchor":"E2:M18","title":"Revenue Build"}}
+ "props":{"dataRange":"DCF!A2:C7","chartType":"line","anchor":"E2:M18","title":"Revenue Build"}}
 ```
 
 `data` or `dataRange` is **required** — a chart with no data is an error. The first column becomes
-categories unless you pass `categories=`. `dispunits=millions` tames large value axes. For unusual
-charts, `officecli help xlsx chart` is authoritative over this snippet.
+categories unless you pass `categories=`. `dispunits=millions` tames large value axes.
+
+Use **`chartType=`** — that is the property `officecli help xlsx chart` documents (`line`, `bar`,
+`column`, `pie`, …). A bare `type="line"` also works and stores identically (verified: both read
+back as `chartType=line`), but it is an undocumented alias, so prefer `chartType=` unless you are
+following an older example. For anything unusual, `officecli help xlsx chart` is authoritative
+over this snippet.
 
 ## Help-first
 
