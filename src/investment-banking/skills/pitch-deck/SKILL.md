@@ -104,10 +104,16 @@ Pitch Deck Progress:
 **This is a feedback loop. Repeat until all checks pass OR escalation is triggered.**
 
 ```bash
-# Convert to images for visual validation
-soffice --headless --convert-to pdf presentation.pptx
-pdftoppm -jpeg -r 150 presentation.pdf slide
+# Render to images for visual validation — officecli does this natively,
+# so no LibreOffice and no poppler/pdftoppm are required.
+officecli view presentation.pptx screenshot -o out/slide --page 1-20
+# or a whole-deck contact sheet:
+officecli view presentation.pptx screenshot -o out/contact.png --grid
 ```
+
+> Do **not** use the `soffice --headless --convert-to pdf` + `pdftoppm` chain from the upstream
+> skill: it needs LibreOffice *and* poppler, neither of which is guaranteed to be installed.
+> `officecli view ... screenshot` needs nothing beyond officecli itself.
 
 **Validation checklist (check each slide image):**
 - [ ] Text readable against background?
@@ -311,10 +317,13 @@ For detailed explanations of the most critical failures, see [Critical Anti-Patt
 
 ## Error Handling
 
-**If PDF/image conversion fails:**
-1. Check LibreOffice is installed: `which soffice`
-2. Try alternative: `libreoffice --headless --convert-to pdf presentation.pptx`
-3. If still failing, open in PowerPoint/LibreOffice manually and export
+**If image rendering fails:**
+1. Confirm the file is built first: `officecli validate presentation.pptx`
+2. Re-run `officecli view presentation.pptx screenshot` — it renders from the file directly and
+   needs no external converter
+3. If rendering still fails, `officecli view presentation.pptx html` gives a readable structural
+   fallback (content and layout, **not** visual fidelity)
+4. If neither works, say the visual pass is unverified rather than implying you checked it
 
 **If source data has inconsistencies or conflicts:**
 1. **Priority order**: Use data explicitly provided in the task files first

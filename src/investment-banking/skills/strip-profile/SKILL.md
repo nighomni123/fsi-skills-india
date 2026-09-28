@@ -58,9 +58,10 @@ description: |
 1. Create ONLY this one slide with PptxGenJS
 2. **MANDATORY: Convert to image for review** - You MUST convert slides to images so you can visually verify them:
    ```bash
-   soffice --headless --convert-to pdf presentation.pptx
-   pdftoppm -jpeg -r 150 -f 1 -l 1 presentation.pdf slide
+   officecli view presentation.pptx screenshot -o out/slide --page 1
    ```
+   (officecli renders natively — no LibreOffice or poppler needed, unlike the upstream
+   `soffice` + `pdftoppm` chain.)
 3. **MANDATORY VISUAL REVIEW**: You MUST carefully examine the rendered slide image before proceeding:
    - **Text overlap check**: Scan every text element - do any labels, bullets, or titles collide with each other?
    - **Text cutoff check**: Is any text truncated at boundaries? Are all words fully visible?

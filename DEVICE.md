@@ -89,6 +89,45 @@ The skills in **this** repo avoid `jq` entirely and use `python3` instead, so th
 
 ---
 
+## Missing tooling, and what it breaks
+
+This machine has **no system package manager** — no Homebrew, no MacPorts, no nix. Available: node,
+npm, pnpm, python3, pip3, uv, git, curl. macOS has never shipped `jq`, so anything expecting it had
+to be installed by hand.
+
+| Tool | Status | What it breaks | Fix |
+|---|---|---|---|
+| `jq` | **installed 2026-09-28** (1.7.1, `/usr/local/bin/jq`) | was blocking Delivery Gates in 9 pre-existing officecli skills | done |
+| LibreOffice (`soffice`) | **missing** | the upstream `pitch-deck` / `strip-profile` PPTX-to-PDF visual loop | **avoided** — this fork uses `officecli view ... screenshot` |
+| poppler (`pdftoppm`) | **missing** | the other half of that same chain | **avoided** — same |
+| `wget`, `pandoc`, `magick` | missing | nothing references them | — |
+
+Install a standalone binary with no package manager (how `jq` was done):
+
+```bash
+curl -fsSL -o /usr/local/bin/jq \
+  https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-macos-amd64
+chmod +x /usr/local/bin/jq
+```
+
+**`convert` is a false positive** when auditing these skills — every hit is the English verb, not
+ImageMagick. The genuine external binaries are `soffice`, `pdftoppm`, and `jq`.
+
+### The misleading screenshot error
+
+`officecli view <deck> screenshot -o out/slide` — no file extension — fails with:
+
+```
+No headless browser available. Install Chrome/Edge/Chromium or Firefox,
+or `pip install playwright && playwright install chromium`.
+```
+
+**That diagnosis is wrong.** The browser is fine; officecli cannot infer a mime type from an
+extensionless output path. Add the extension (`-o out/slide.png`) and it works. Verified on the same
+deck minutes apart. Do not install Playwright because of this message.
+
+---
+
 ## `monid` sandbox quirk
 
 `monid` writes config via XDG paths, which the sandbox denies under `~/.config`. Always run it as:

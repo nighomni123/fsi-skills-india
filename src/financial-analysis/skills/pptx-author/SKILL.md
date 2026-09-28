@@ -110,7 +110,14 @@ reader is expected to verify.
 officecli view out/deck.pptx issues           # low contrast, distorted pictures, empty fields
 officecli view out/deck.pptx outline          # title per slide — read the argument back
 officecli view out/deck.pptx screenshot -o out/preview.png --page 1-3
+officecli view out/deck.pptx screenshot -o out/contact.png --grid   # whole-deck thumbnails
 ```
+
+> **⚠️ `-o` needs an explicit file extension.** `screenshot -o out/slide` (no `.png`) fails with
+> *"No headless browser available. Install Chrome/Edge/Chromium..."* — which is **wrong**. The
+> browser is fine; officecli just cannot infer a mime type from an extensionless path. Use
+> `-o out/slide.png` (or `.jpg`). Verified 2026-09-28: the same deck fails extensionless and
+> succeeds with `.png`. Do not go installing Playwright because of that message.
 
 `view issues` catches `low_contrast` (text that won't survive a projector), `picture_aspect_distorted`,
 and `slide_field_not_evaluated` (empty slide numbers or dates). Then read `outline` — if the titles
