@@ -35,12 +35,12 @@ each entry here says what was dropped and what the honest substitute is, if any.
 
 | # | Item | Class | Honest substitute |
 |---|---|---|---|
-| 3.1 | **Sell-side consensus estimates** | `DATA` | There is no free India equivalent of IBES consensus. US data: Alpha Vantage / yfinance. India: **none**. A "consensus vs own estimate" deliverable is therefore impossible without a paid feed — the skill must output own estimates only and say so, not invent a consensus bar. |
+| 3.1 | **Consensus *depth*, not its existence** | `PARTIAL` | **Corrected 2026-09-28 after live testing.** An earlier draft of this file asserted India has *no* free sell-side consensus. **That was wrong.** `yfinance` serves real India consensus — `earnings_estimate` / `revenue_estimate` (avg, low, high, numberOfAnalysts, growth, currency), `eps_trend` (current vs 7/30/60/90 days ago = genuine revision history), and `analyst_price_targets` (mean/median/high/low). Verified on RELIANCE.NS: 27 analysts, EPS 0y avg ₹63.95. **What actually degrades:** coverage is patchy (IRFC returned **1** analyst; BEL 21, SUZLON 12, YESBANK 10); quarterly coverage is far thinner than annual (RELIANCE `0q`/`+1q` had only **2** analysts); and the source is Yahoo, not IBES, so the basis differs from a US comparison. The consensus-vs-own-estimate workflow therefore **ports with caveats**, not the wholesale exclusion first claimed. |
 | 3.2 | **Private-placement / funding-round tape** | `DATA` | The US substitute is SEC Form D. **India has no equivalent public filing of private raises at comparable granularity** — private placement disclosures go to the exchanges and are inconsistently machine-readable, and late-stage/PE rounds are largely undisclosed. The `funding-digest` skill does not port to India. |
 | 3.3 | **Swap curves, OIS/swap spreads** | `DATA` | RBI publishes G-sec yields, not a swap curve. No free source. Curve analysis is government-bond-only; any "swap spread" output would be fabricated. |
 | 3.4 | **Single-name corporate bond prices/curves** | `DATA` | No Indian TRACE equivalent. Free single-name bond pricing does not exist. Credit work is limited to G-sec curves, sovereign/AAA indices, and issuer-level spreads derived from listed instruments. |
 | 3.5 | **Historical options vol surfaces** | `DATA` | NSE publishes some option-chain and index-vol data, but a free, complete, survivorship-consistent historical surface across strikes and expiries is not available. Current-surface reads only; no backtesting. |
-| 3.6 | **FX forward points / NDF curves** | `DATA` | Spot INR is free. Forward points and NDF curves are not. FX carry is a spot-differential proxy, and must be labelled as one. |
+| 3.6 | **FX forward points / NDF curves** | `DATA` | Spot INR **is** free and verified: FRED keyless `DEXINUS` returned 94.95 for 2026-09-01. Forward points and NDF curves are not. FX carry is a spot-differential proxy, and must be labelled as one. |
 | 3.7 | **Institutional holdings and block-deal history** | `DATA` | Free promoter/institutional holding snapshots exist; a consistent multi-year holdings history at scale does not. |
 | 3.8 | **Insider-trade / pledge history depth** | `DATA` | SEBI/NSE publish current disclosures. Building a reliable multi-year time series requires paid aggregators. |
 | 3.9 | **Precedent transactions database** | `DATA` | No free structured Indian M&A precedent set. Deal comps must come from the user or from individually-sourced public announcements, cited per deal. |
@@ -54,6 +54,7 @@ each entry here says what was dropped and what the honest substitute is, if any.
 | 4.2 | **Dual listing NSE/BSE** | `STRUCTURAL` | Most large caps list on both with different tickers and occasionally different liquidity. A single ticker choice silently selects a price series, and liquidity-based screening differs by exchange. |
 | 4.3 | **Circuit limits** | `STRUCTURAL` | 2/10/20% upper-lower circuits (and index-specific bands) mean a "close" can be a circuit-bound print, not a traded price. Price series need a volume sanity check; a zero/low-volume circuit print is not a data point. |
 | 4.4 | **P-Notes and FPI flows** | `STRUCTURAL` | Foreign Portfolio Investor exposure and P-Note (participating derivative) positions distort price formation in a way that has no US analogue in most mid caps. Index-level foreign-flow interpretation does not port. |
+| 4.6 | **Ticker symbols break on demerger** | `STRUCTURAL` | Verified: `TATAMTRDVR.NS` now returns *"No data found, symbol may be delisted"* after the Tata Motors demerger. A guessed ticker 404s rather than degrading, and the obvious ticker is often wrong — SBI is `SBIN.NS`, **not** `INDIA.NS`. Resolve symbols against a live quote before building anything on them. |
 | 4.5 | **Promoter pledging** | `STRUCTURAL` | Promoter share pledging is a first-order Indian risk signal with a dedicated disclosure regime and no clean US equivalent. It belongs in Indian risk sections and must not be dropped. |
 
 ## 5. Regulatory and governance
@@ -70,7 +71,7 @@ each entry here says what was dropped and what the honest substitute is, if any.
 | Skill | Status | Reason |
 |---|---|---|
 | `funding-digest` | **Does not port** | 3.2 — no Form D equivalent |
-| `earnings-preview-beta` (consensus half) | **Partial** | 3.1 — own-estimate half ports; the consensus-vs-estimate framing does not |
+| `earnings-preview-beta` | **Partial** | 3.1 — consensus ports via yfinance, but coverage is patchy and quarterly depth is thin; state the analyst count or don't quote the consensus |
 | `swap-curve-strategy` | **Partial** | 3.3 — already reduced to a government-curve skill upstream; the India version is G-sec only |
 | `fixed-income-portfolio` | **Partial** | 3.4 — index/G-sec level only, no bond-level analytics |
 | `option-vol-analysis` | **Partial** | 3.5 — current chain only |
