@@ -164,7 +164,7 @@ So:
 | Need | Status |
 |---|---|
 | CPI, WPI, GDP, IIP | Published by MOSPI / NSO / Office of the Economic Adviser. Historically **PDF/HTML-first and lagged**, not a clean API — **unverified** as machine-readable. Extract from the release and cite the release date. |
-| RBI repo rate, G-sec yields | Published by RBI (DBIE and the RBI website). **Unverified** as a clean endpoint here — confirm before relying on it. |
+| RBI repo rate, G-sec yields | **No free machine-readable feed found.** Tested 2026-09-28: `rbi.org.in` pages return HTTP 200 but are **HTML, not an API** (DBIE, MAS circulars, press releases); DBnomics has **no RBI provider** (404); FRED keyless has **no India 10Y G-sec series** (the plausible id returns an error page). An Indian WACC therefore needs the 10Y G-sec **read off an RBI/NSE curve for the valuation date and hand-sourced with its date** — it cannot be pulled from a free API. This is the single largest India data gap; see `NOT-ADAPTABLE.md`. |
 | Company financials | yfinance annual statements (above), or the company's own results/annual report. |
 | Statutory filings | **MCA21**, behind a login, not API-friendly. There is **no Indian EDGAR** — no single free, complete, machine-readable filing database. |
 | Shareholding pattern, promoter pledge, RPT | BSE/NSE publish these. Current disclosure is available; a reliable multi-year series is not free. |
