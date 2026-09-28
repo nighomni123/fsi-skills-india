@@ -72,6 +72,23 @@ lakh and crore freely within the same table. When a number's magnitude is implau
 "revenue" of 12 for a large cap, or 1,23,45,67,89,012 — the unit is wrong, not the company. Reject
 and re-derive rather than guessing a scale factor.
 
+### A second argument for crore: Excel's precision ceiling
+
+Raw rupee magnitudes for Indian large caps run to **14 digits** — Reliance FY26 revenue is
+`10572193000000` (₹1.06 lakh crore). Excel carries 15 significant digits, so that still stores
+exactly, but it sits at the edge and it **displays in scientific notation** under General format.
+`officecli view` reports it as `general_precision_loss`:
+
+```
+General precision loss: 14 significant digits stored, Excel displays '1.05722E+13'
+(General caps at 11)
+```
+
+Storing in ₹ crore keeps the same number to ~7 digits — well clear of the ceiling and readable in a
+cell. So the convention earns its keep twice: it avoids the 100× display trap, and it keeps the
+workbook exact and legible. Apply an explicit `numberformat` to every money column regardless;
+`view issues` will name the ones still on General.
+
 ---
 
 ## 2. Fiscal year
