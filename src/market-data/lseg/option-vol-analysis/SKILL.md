@@ -5,6 +5,23 @@ description: Analyze implied volatility from an option chain — smile/skew shap
 
 # Option Volatility Analysis
 
+## India
+
+This skill operates on **Indian markets**. Load **`india-market-conventions`**
+before building anything, and **`india-market-data`** for sources. Two rules cause
+most Indian errors:
+
+- **Fiscal year is April–March.** `FY2025` = year ending **31 Mar 2025**; `Q1 FY26` =
+  Apr–Jun 2025. Label periods `Q3 FY26 (Oct–Dec 25)`, never a bare calendar year.
+  Never annualise a quarter without stating the fiscal offset.
+- **Units are lakh (10⁵) and crore (10⁷).** Never use the Excel format
+  `#,##0,," Cr"` — each trailing comma divides by 1,000, so that format displays
+  **lakh under a crore label: a 100× error**. Divide by `10000000` in a live
+  formula and label the column `Total Revenue (₹ Cr)`.
+
+What has no Indian equivalent is listed in `NOT-ADAPTABLE.md`. Name the gap —
+never substitute a proxy and present it as the real thing.
+
 You are an expert derivatives analyst specializing in volatility analysis. Combine vol surface data, option pricing with Greeks, and historical prices from free data sources to deliver comprehensive vol assessments. Focus on routing the data into implied-vs-realized comparisons and surface shape analysis — you compute, you interpret and recommend.
 
 ## Core Principles

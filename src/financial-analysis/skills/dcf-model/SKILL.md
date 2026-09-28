@@ -5,6 +5,23 @@ description: Real DCF (Discounted Cash Flow) model creation for equity valuation
 
 # DCF Model Builder
 
+## India
+
+This skill operates on **Indian markets**. Load **`india-market-conventions`**
+before building anything, and **`india-market-data`** for sources. Two rules cause
+most Indian errors:
+
+- **Fiscal year is April–March.** `FY2025` = year ending **31 Mar 2025**; `Q1 FY26` =
+  Apr–Jun 2025. Label periods `Q3 FY26 (Oct–Dec 25)`, never a bare calendar year.
+  Never annualise a quarter without stating the fiscal offset.
+- **Units are lakh (10⁵) and crore (10⁷).** Never use the Excel format
+  `#,##0,," Cr"` — each trailing comma divides by 1,000, so that format displays
+  **lakh under a crore label: a 100× error**. Divide by `10000000` in a live
+  formula and label the column `Total Revenue (₹ Cr)`.
+
+What has no Indian equivalent is listed in `NOT-ADAPTABLE.md`. Name the gap —
+never substitute a proxy and present it as the real thing.
+
 ## Overview
 
 This skill creates institutional-quality DCF models for equity valuation following investment banking standards. Each analysis produces a detailed Excel model (with sensitivity analysis included at the bottom of the DCF sheet).
@@ -209,9 +226,13 @@ EBIT
 Cost of Equity = Risk-Free Rate + Beta × Equity Risk Premium
 
 Where:
-- Risk-Free Rate = Current 10-Year Treasury Yield
-- Beta = 5-year monthly stock beta vs market index
-- Equity Risk Premium = 5.0-6.0% (market standard)
+- Risk-Free Rate = **current 10-year Indian government security (G-sec) yield**, not a US Treasury yield.
+  There is no free streaming G-sec feed — read the 10Y off an RBI/NSE curve for the valuation date,
+  and record it as a sourced input with its date. A stale gilt rate silently moves every valuation.
+- Beta = 5-year monthly stock beta vs **NIFTY 50** (state the index — NIFTY 50 and the BSE Sensex are
+  different indices, and neither is the S&P 500; a US-computed beta is not a substitute).
+- Equity Risk Premium = 5.0-6.0% (market standard). This is a judgement input: state the basis and
+  do not present it as a market observation.
 ```
 
 **Cost of Debt Calculation:**
@@ -732,7 +753,7 @@ In addition, be aware of these errors:
 - Mixing book and market values in capital structure
 - Using equity beta instead of asset/unlevered beta incorrectly
 - Wrong tax rate application to cost of debt
-- Incorrect risk-free rate (must use current 10Y Treasury)
+- Incorrect risk-free rate — in an Indian model this must be the current 10Y **G-sec**, not a US 10Y Treasury, and must be dated
 - Failure to adjust for net debt vs net cash position
 
 ### Growth Assumption Flaws
@@ -1032,7 +1053,7 @@ Implied Upside/(Downside),XX%,,,,,
 
 ```csv
 COST OF EQUITY CALCULATION,,
-Risk-Free Rate (10Y Treasury),X.XX%,[Yellow input]
+Risk-Free Rate (10Y G-sec),X.XX%,[Yellow input - cite RBI/NSE curve + date]
 Beta (5Y monthly),X.XX,[Yellow input]
 Equity Risk Premium,X.XX%,[Yellow input]
 Cost of Equity,X.XX%,[Calculated blue]

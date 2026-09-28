@@ -1,14 +1,31 @@
 ---
 name: tear-sheet
-description: "Generate a professional company tear sheet — a dense single-company one-pager — as a Word .docx, sourced entirely from free public data (SEC EDGAR XBRL, yfinance, FRED). Trigger this skill whenever the user asks for a tear sheet, company one-pager, company profile, fact sheet, company snapshot, company brief, company overview, or a 'tell me about <Company>' write-up — especially when they name a company or ticker. Also trigger for equity research summaries, M&A / investment banking company profiles, corporate development target profiles, and sales or business-development meeting-prep documents for a prospect. Four audience types: equity research, IB/M&A, corporate development, and sales/BD; ask which one if the user doesn't say. Works for public and private companies."
+description: "Generate a professional company tear sheet — a dense single-company one-pager — as a Word .docx, sourced entirely from free public data (Indian sources (yfinance .NS statements, company filings), yfinance, FRED). Trigger this skill whenever the user asks for a tear sheet, company one-pager, company profile, fact sheet, company snapshot, company brief, company overview, or a 'tell me about <Company>' write-up — especially when they name a company or ticker. Also trigger for equity research summaries, M&A / investment banking company profiles, corporate development target profiles, and sales or business-development meeting-prep documents for a prospect. Four audience types: equity research, IB/M&A, corporate development, and sales/BD; ask which one if the user doesn't say. Works for public and private companies."
 ---
 
 # Financial Tear Sheet Generator
 
+## India
+
+This skill operates on **Indian markets**. Load **`india-market-conventions`**
+before building anything, and **`india-market-data`** for sources. Two rules cause
+most Indian errors:
+
+- **Fiscal year is April–March.** `FY2025` = year ending **31 Mar 2025**; `Q1 FY26` =
+  Apr–Jun 2025. Label periods `Q3 FY26 (Oct–Dec 25)`, never a bare calendar year.
+  Never annualise a quarter without stating the fiscal offset.
+- **Units are lakh (10⁵) and crore (10⁷).** Never use the Excel format
+  `#,##0,," Cr"` — each trailing comma divides by 1,000, so that format displays
+  **lakh under a crore label: a 100× error**. Divide by `10000000` in a live
+  formula and label the column `Total Revenue (₹ Cr)`.
+
+What has no Indian equivalent is listed in `NOT-ADAPTABLE.md`. Name the gap —
+never substitute a proxy and present it as the real thing.
+
 Generate audience-specific company tear sheets from **free, no-terminal data** and render the result as a
 professional Word document with the **`officecli` CLI**.
 
-Data comes from the free stack documented in `market-data-sources` (SEC EDGAR XBRL primary, yfinance,
+Data comes from the free stack documented in `market-data-sources` (Indian sources (yfinance .NS statements, company filings) primary, yfinance,
 FRED). Document mechanics come from the `officecli-docx` skill. This file is the finance layer on top:
 the style config, the audience methodology, and the build library.
 
@@ -25,7 +42,7 @@ the style config, the audience methodology, and the build library.
 
 The tear sheet is a document a reader will act on. One invented number destroys the whole thing.
 
-### Primary — SEC EDGAR XBRL (fundamentals, no key)
+### Primary — Indian sources (yfinance .NS statements, company filings) (fundamentals, no key)
 
 The best free replacement for terminal fundamentals. **US filers only.** Every request needs a
 `User-Agent` header (`"Name email@domain"`); the fair-access limit is 10 req/s.
@@ -272,7 +289,7 @@ Formatting Notes.
 
 Two lines, centered, repeated on every page:
 
-- Line 1: `Data: SEC EDGAR XBRL + yfinance | Analysis: AI-generated | [Month Day, Year]`
+- Line 1: `Data: Indian sources (yfinance .NS statements, company filings) + yfinance | Analysis: AI-generated | [Month Day, Year]`
 - Line 2: `For informational purposes only. Not investment advice.`
 
 Style: 7pt italic, centered, `#666666`. Identical wording across all four audience types for the same
@@ -350,7 +367,7 @@ ts_bullet() {
 # ── 6. createFooter ────────────────────────────────────────────────────
 ts_footer() {                      # ts_footer "September 28, 2026"
   officecli add "$F" / --type footer --prop type=default \
-    --prop text="Data: SEC EDGAR XBRL + yfinance | Analysis: AI-generated | $1"
+    --prop text="Data: Indian sources (yfinance .NS statements, company filings) + yfinance | Analysis: AI-generated | $1"
   officecli set "$F" "/footer[1]/p[1]" --prop align=center --prop size=7pt \
     --prop italic=true --prop color=$TS_FOOTER --prop font=Arial
   officecli add "$F" "/footer[1]" --type paragraph \
@@ -615,7 +632,7 @@ on; a number without a source cannot be checked, and a checkable tear sheet is t
 free data instead of a paid terminal.
 
 1. **Intermediate files carry a `source` column** (see the schemas below) for every row, in the form:
-   `Source: SEC EDGAR XBRL companyfacts (CIK 0001045810), FY2024 10-K, retrieved 2026-09-28`
+   `Source: Indian sources (yfinance .NS statements, company filings) companyfacts (CIK 0001045810), FY2024 10-K, retrieved 2026-09-28`
    `Source: yfinance .info, retrieved 2026-09-28 (EOD, delayed)`
    `Source: Alpha Vantage EARNINGS_ESTIMATES (IBES-sourced), retrieved 2026-09-28`
    `Source: FRED series T10Y2Y, retrieved 2026-09-28`

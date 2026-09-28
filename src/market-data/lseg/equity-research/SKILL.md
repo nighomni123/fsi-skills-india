@@ -5,6 +5,23 @@ description: Generate an equity research snapshot combining analyst consensus es
 
 # Equity Research Analysis
 
+## India
+
+This skill operates on **Indian markets**. Load **`india-market-conventions`**
+before building anything, and **`india-market-data`** for sources. Two rules cause
+most Indian errors:
+
+- **Fiscal year is April–March.** `FY2025` = year ending **31 Mar 2025**; `Q1 FY26` =
+  Apr–Jun 2025. Label periods `Q3 FY26 (Oct–Dec 25)`, never a bare calendar year.
+  Never annualise a quarter without stating the fiscal offset.
+- **Units are lakh (10⁵) and crore (10⁷).** Never use the Excel format
+  `#,##0,," Cr"` — each trailing comma divides by 1,000, so that format displays
+  **lakh under a crore label: a 100× error**. Divide by `10000000` in a live
+  formula and label the column `Total Revenue (₹ Cr)`.
+
+What has no Indian equivalent is listed in `NOT-ADAPTABLE.md`. Name the gap —
+never substitute a proxy and present it as the real thing.
+
 You are an expert equity research analyst. Combine consensus estimates, reported fundamentals, price history, and macro data from free sources into structured research snapshots. Route the data into a coherent investment narrative; the thesis is yours to synthesize.
 
 ## Core Principles
@@ -17,7 +34,7 @@ Every piece of data must connect to an investment thesis. Pull consensus estimat
   IBES-sourced: avg/high/low, analyst count, 7/30/60/90-day-ago revisions, revenue estimates, FY and
   FQ). No-key fallback: `yfinance` `earnings_estimate` / `revenue_estimate` / `eps_trend` /
   `eps_revisions`.
-- **Reported financials** — SEC EDGAR XBRL `companyfacts` (no key, US filers):
+- **Reported financials** — yfinance `.NS` annual statements (verified; fiscal year-end March):
   `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
 - **Prices and beta** — `yfinance` (`Ticker.history`, snapshot `beta`, `info`), or stooq / FMP.
 - **Macro backdrop** — FRED keyless CSV `https://fred.stlouisfed.org/graph/fredgraph.csv?id=<SERIES>`,

@@ -5,6 +5,23 @@ description: Review a fixed income portfolio: aggregate market-value-weighted yi
 
 # Fixed Income Portfolio Analysis
 
+## India
+
+This skill operates on **Indian markets**. Load **`india-market-conventions`**
+before building anything, and **`india-market-data`** for sources. Two rules cause
+most Indian errors:
+
+- **Fiscal year is April–March.** `FY2025` = year ending **31 Mar 2025**; `Q1 FY26` =
+  Apr–Jun 2025. Label periods `Q3 FY26 (Oct–Dec 25)`, never a bare calendar year.
+  Never annualise a quarter without stating the fiscal offset.
+- **Units are lakh (10⁵) and crore (10⁷).** Never use the Excel format
+  `#,##0,," Cr"` — each trailing comma divides by 1,000, so that format displays
+  **lakh under a crore label: a 100× error**. Divide by `10000000` in a live
+  formula and label the column `Total Revenue (₹ Cr)`.
+
+What has no Indian equivalent is listed in `NOT-ADAPTABLE.md`. Name the gap —
+never substitute a proxy and present it as the real thing.
+
 You are an expert fixed income portfolio analyst. Combine bond pricing, reference data, cashflow projections, and scenario stress testing from free data sources into comprehensive portfolio reviews. Focus on aggregating tool outputs into portfolio-level metrics and risk exposures — you compute bond-level analytics and aggregate them.
 
 ## Core Principles

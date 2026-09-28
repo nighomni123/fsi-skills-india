@@ -5,6 +5,23 @@ description: Build a financial .xlsx workbook as a file on disk using the office
 
 # xlsx-author
 
+## India
+
+This skill operates on **Indian markets**. Load **`india-market-conventions`**
+before building anything, and **`india-market-data`** for sources. Two rules cause
+most Indian errors:
+
+- **Fiscal year is April–March.** `FY2025` = year ending **31 Mar 2025**; `Q1 FY26` =
+  Apr–Jun 2025. Label periods `Q3 FY26 (Oct–Dec 25)`, never a bare calendar year.
+  Never annualise a quarter without stating the fiscal offset.
+- **Units are lakh (10⁵) and crore (10⁷).** Never use the Excel format
+  `#,##0,," Cr"` — each trailing comma divides by 1,000, so that format displays
+  **lakh under a crore label: a 100× error**. Divide by `10000000` in a live
+  formula and label the column `Total Revenue (₹ Cr)`.
+
+What has no Indian equivalent is listed in `NOT-ADAPTABLE.md`. Name the gap —
+never substitute a proxy and present it as the real thing.
+
 Build Excel workbooks as **file artifacts** with `officecli`. This is the toolchain skill every other
 modeling skill (`dcf-model`, `lbo-model`, `3-statement-model`, `comps-analysis`, `roll-forward`,
 `accrual-schedule`, `nav-tieout`, `unit-economics`, `returns-analysis`, …) depends on.
@@ -75,6 +92,46 @@ So: build → `officecli get` to verify → `officecli close`. No recalc script,
 dependency. Excel and LibreOffice still recalculate on open, so this only affects your own readback.
 
 ## Conventions
+
+### Indian units — the crore/lakh trap
+
+Most Indian figures arrive in **rupees** and get presented in **lakh (10⁵)** or **crore (10⁷)**.
+Write the source value once in raw rupees as a blue input, then derive the presentation unit in a
+black formula cell, and put the unit in the **column header**.
+
+```json
+{"command":"add","parent":"Inputs!C2","type":"cell","props":{"value":1234567890,"font.color":"0000FF"}},
+{"command":"add","parent":"DCF!D5","type":"cell",
+ "props":{"formula":"Inputs!$C$2/10000000","numberformat":"#,##0.00"}}     ✅ crore
+```
+
+> **Never use `#,##0,," Cr"`.** In an Excel number format **each trailing comma divides by 1,000**.
+> Crore is 10⁷, which is *not* a multiple of 1,000, so no number of commas yields crore:
+>
+> | Format | On `1234567890` shows | Actually is |
+> |---|---|---|
+> | `#,##0` | `1,234,567,890` | rupees |
+> | `#,##0,,` | `1,235` | **lakh (10⁶)** |
+> | `#,##0,,,` | `1` | 10⁹ |
+>
+> So the format everyone reaches for displays **lakh under a crore label — a 100× error** that is
+> invisible in the formula bar because the stored value never changed. Divide by `10000000` in a
+> formula instead. (Verified against officecli 2026-09-28.)
+
+Sanity-check magnitude on every figure pulled from an Indian source: an implausible scale usually
+means the unit is wrong, not the company. Re-derive rather than guessing a factor.
+
+### Indian fiscal periods
+
+The fiscal year runs **1 April – 31 March**. `FY2025` = year ending 31 Mar 2025; `Q1 FY26` =
+Apr–Jun 2025. Put the period in the header, not just the cell:
+
+```
+["Q3 FY26 (Oct–Dec 25)", "Q2 FY26 (Jul–Sep 25)", "Q1 FY26 (Apr–Jun 25)"]
+```
+
+Never annualise a quarter without stating the fiscal offset, and label an LTM by the two fiscal
+years it actually spans (`LTM (Q2FY25–Q1FY26)`).
 
 ### Blue / black / green
 
