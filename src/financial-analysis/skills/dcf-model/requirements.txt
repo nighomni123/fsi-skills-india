@@ -1,6 +1,13 @@
-# DCF Model Builder - Python Dependencies
+# DCF Model Builder - Python dependencies
+#
+# The workbook itself is built and verified with the `officecli` CLI — no Python
+# needed for that. This file is only for scripts/validate_dcf.py, which reads a
+# finished workbook's cached formula values to run the DCF logic checks
+# (terminal growth vs WACC, WACC range, terminal value proportion).
+#
+# Formula-error and layout QA is `officecli view <model>.xlsx issues` — no dependency.
 
-# Excel file handling
+# Excel file reading for validate_dcf.py only
 openpyxl>=3.0.0
 
 # HTTP requests

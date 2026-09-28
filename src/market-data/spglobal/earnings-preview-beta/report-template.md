@@ -174,6 +174,29 @@ The report is a single self-contained HTML file with:
     .neg { color: #c0392b; font-weight: 600; }
     .neutral { color: #555; }
     .highlight-row { background: #e8eaf6 !important; font-weight: 600; }
+    tfoot td { background: #f0f1f5; font-weight: 600; border-top: 2px solid #1a1a4e; }
+    /* Consensus-basis tag: makes the IBES-vs-Yahoo distinction visible at the cell */
+    .basis {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: #1a1a4e;
+      background: #e8eaf6;
+      border: 1px solid #c3c8dd;
+      border-radius: 2px;
+      padding: 0 4px;
+      margin-left: 4px;
+      vertical-align: 1px;
+    }
+    .source code {
+      font-family: 'Courier New', monospace;
+      font-size: 9.5px;
+      background: #f0f1f5;
+      padding: 0 3px;
+      border-radius: 2px;
+    }
 
     /* ── Chart Containers ── */
     .chart-row {
@@ -391,29 +414,64 @@ The report is a single self-contained HTML file with:
   <!-- ════════════════════════════════════════════ -->
   <div class="page-break">
 
-    <!-- Consensus Estimates Table (Figure label inline) -->
-    <h2 class="section-title">Consensus Estimates — [Q# FY####]</h2>
-    <h4 class="figure-title">[Q# FY####] Consensus Estimates</h4>
+    <!-- Figure A: Consensus & Revision Table -->
+    <h2 class="section-title">Consensus, Revisions &amp; Surprise History — [Q# FY####]</h2>
+    <h4 class="figure-title">Figure A: Consensus &amp; Estimate Revisions — [Q# FY####]</h4>
     <table>
       <thead>
         <tr>
           <th>Metric</th>
-          <th class="num">Consensus</th>
+          <th class="num">Consensus Mean</th>
+          <th class="num">Low–High Range</th>
           <th class="num">Our Estimate</th>
+          <th class="num">30d Drift</th>
+          <th class="num">90d Drift</th>
           <th class="num">y/y Change</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td>Revenue</td><td class="num"><a href="#ref-N" class="data-ref">$[XX.X]B</a></td><td class="num"><a href="#ref-N" class="data-ref">$[XX.X]B</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td></tr>
-        <tr><td>Diluted EPS</td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]</a></td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td></tr>
-        <tr><td>Gross Margin</td><td class="num"><a href="#ref-N" class="data-ref">[XX.X%]</a></td><td class="num"><a href="#ref-N" class="data-ref">[XX.X%]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-XXbps]</a></td></tr>
-        <tr><td>Operating Income</td><td class="num"><a href="#ref-N" class="data-ref">$[X.X]B</a></td><td class="num"><a href="#ref-N" class="data-ref">$[X.X]B</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td></tr>
+        <tr><td>EPS <span class="basis">IBES</span></td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]</a></td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]–$[X.XX]</a></td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td></tr>
+        <tr><td>Revenue <span class="basis">IBES</span></td><td class="num"><a href="#ref-N" class="data-ref">$[XX.X]B</a></td><td class="num"><a href="#ref-N" class="data-ref">$[XX.X]B–$[XX.X]B</a></td><td class="num"><a href="#ref-N" class="data-ref">$[XX.X]B</a></td><td class="num neutral"><a href="#ref-N" class="data-ref">n/a</a></td><td class="num neutral"><a href="#ref-N" class="data-ref">n/a</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td></tr>
+        <tr><td>Gross Margin</td><td class="num"><a href="#ref-N" class="data-ref">[XX.X%]</a></td><td class="num neutral">—</td><td class="num"><a href="#ref-N" class="data-ref">[XX.X%]</a></td><td class="num neutral">—</td><td class="num neutral">—</td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-XXbps]</a></td></tr>
+        <tr><td>Operating Income</td><td class="num"><a href="#ref-N" class="data-ref">$[X.X]B</a></td><td class="num neutral">—</td><td class="num"><a href="#ref-N" class="data-ref">$[X.X]B</a></td><td class="num neutral">—</td><td class="num neutral">—</td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td></tr>
         <!-- Add 2-3 company-specific KPIs below (e.g., comp sales, eComm growth, membership revenue) -->
-        <tr><td>[Company KPI 1]</td><td class="num">[Value]</td><td class="num">[Value]</td><td class="num [pos|neg]">[Change]</td></tr>
-        <tr><td>[Company KPI 2]</td><td class="num">[Value]</td><td class="num">[Value]</td><td class="num [pos|neg]">[Change]</td></tr>
+        <tr><td>[Company KPI 1]</td><td class="num">[Value]</td><td class="num neutral">—</td><td class="num">[Value]</td><td class="num neutral">—</td><td class="num neutral">—</td><td class="num [pos|neg]">[Change]</td></tr>
+        <tr><td>[Company KPI 2]</td><td class="num">[Value]</td><td class="num neutral">—</td><td class="num">[Value]</td><td class="num neutral">—</td><td class="num neutral">—</td><td class="num [pos|neg]">[Change]</td></tr>
       </tbody>
     </table>
-    <div class="source">Source: Kensho, S&P Capital IQ</div>
+    <div class="source">Source: Alpha Vantage <code>EARNINGS_ESTIMATES</code> (IBES-sourced), retrieved [YYYY-MM-DD].
+      Revenue drift is <code>n/a</code> — that endpoint carries no revenue revision history. Do not construct one.
+      Blank drift cells are genuine absences in the response, not zeros.</div>
+
+    <!-- Figure B: Surprise History Table -->
+    <h4 class="figure-title">Figure B: Surprise History — Last 8 Prints</h4>
+    <table>
+      <thead>
+        <tr>
+          <th>Fiscal Period</th>
+          <th class="num">Reported EPS</th>
+          <th class="num">Consensus EPS</th>
+          <th class="num">Surprise %</th>
+          <th class="num">1-Day Post-Print</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>[Q# FY####]</td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]</a></td><td class="num"><a href="#ref-N" class="data-ref">$[X.XX]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td><td class="num [pos|neg]"><a href="#ref-N" class="data-ref">[+/-X.X%]</a></td><td>[Beat | Miss | In line]</td></tr>
+        <!-- 8 rows, most recent first. Colour the surprise column mechanically. -->
+      </tbody>
+      <tfoot>
+        <tr class="highlight-row">
+          <td colspan="3">Beat rate / mean surprise % / trimmed mean / σ / the bar (mean − 1σ)</td>
+          <td class="num"><a href="#ref-N" class="data-ref">[x of 8]</a></td>
+          <td class="num"><a href="#ref-N" class="data-ref">[+X.X%]</a></td>
+          <td><a href="#ref-N" class="data-ref">bar = [+/-X.X%]</a></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="source">Source: Alpha Vantage <code>EARNINGS</code> (reportedEPS / estimatedEPS / surprisePercentage), retrieved [YYYY-MM-DD];
+      1-day post-print moves computed from yfinance EOD closes. A quarter with a missing estimate is
+      <strong>excluded</strong> from every statistic and named in Manual Review — never silently dropped.</div>
 
     <!-- Key Metrics Beyond Headline EPS -->
     <h3 class="subsection-title">Key Metrics Beyond Headline EPS</h3>
@@ -438,16 +496,21 @@ The report is a single self-contained HTML file with:
     </div>
 
     <!-- Recent News & Developments -->
-    <h3 class="subsection-title">Recent News & Developments</h3>
+    <h3 class="subsection-title">Recent News &amp; Developments</h3>
     <div class="news-list">
       <ul>
-        <li><strong>[Date]:</strong> [Headline] — [Brief impact assessment, one line]</li>
-        <li><strong>[Date]:</strong> [Headline] — [Impact]</li>
-        <li><strong>[Date]:</strong> [Headline] — [Impact]</li>
-        <!-- 3-5 material items from last 60 days -->
+        <li><strong>[Filing date]:</strong> [Headline] — [Brief impact assessment, one line] — <a href="[EDGAR filing-index URL]" target="_blank" class="src-url">[Form 8-K, [Filer Name]]</a></li>
+        <li><strong>[Date]:</strong> [Headline] — [Impact] — <a href="[URL]" target="_blank" class="src-url">[Source]</a></li>
+        <li><strong>[Date]:</strong> [Headline] — [Impact] — <a href="[URL]" target="_blank" class="src-url">[Source]</a></li>
+        <!-- 3-5 material items, last 60-90 days. Every item carries a clickable source URL.
+             If a category returns nothing, write it as a finding rather than padding:
+             "no material 8-K events identified in the last 60 days from EDGAR full-text search". -->
       </ul>
     </div>
-    <div class="source">Source: Kensho</div>
+    <div class="source">Source: SEC EDGAR full-text search
+      (<code>efts.sec.gov/LATEST/search-index?q=…&amp;forms=8-K&amp;ciks=…</code>), company IR pages,
+      yfinance news. Analyst actions from Yahoo Finance are <strong>not</strong> IBES and carry no
+      source document — unverifiable actions go to Manual Review, not the narrative.</div>
 
   </div>
 
@@ -463,14 +526,16 @@ The report is a single self-contained HTML file with:
       <div class="chart-container">
         <h4 class="figure-title">Figure 1: Quarterly Revenue & Diluted EPS</h4>
         <canvas id="chart-rev-eps"></canvas>
-        <div class="source">Source: S&P Capital IQ</div>
+        <div class="source">Source: SEC EDGAR XBRL companyfacts, CIK [0000000000] —
+          us-gaap:Revenues and us-gaap:EarningsPerShareDiluted. Derived quarters are marked (FY − 9M).</div>
       </div>
 
       <!-- Figure 2: Margin Trends -->
       <div class="chart-container">
         <h4 class="figure-title">Figure 2: Margin Trends (Gross & Operating %)</h4>
         <canvas id="chart-margins"></canvas>
-        <div class="source">Source: S&P Capital IQ</div>
+        <div class="source">Source: SEC EDGAR XBRL companyfacts — us-gaap:GrossProfit / us-gaap:OperatingIncomeLoss
+          over us-gaap:Revenues. Calculated; no quarter is interpolated.</div>
       </div>
     </div>
 
@@ -479,7 +544,8 @@ The report is a single self-contained HTML file with:
       <div class="chart-container chart-full">
         <h4 class="figure-title">Figure 3: Revenue Growth y/y (%)</h4>
         <canvas id="chart-rev-growth" style="max-height: 200px;"></canvas>
-        <div class="source">Source: S&P Capital IQ</div>
+        <div class="source">Source: SEC EDGAR XBRL companyfacts (calculated). Quarters with no derivable
+          year-ago figure are omitted, not zero-filled.</div>
       </div>
     </div>
 

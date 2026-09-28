@@ -160,7 +160,13 @@ class DCFModelValidator:
     def _check_wacc_range(self):
         """Check if WACC is in reasonable range"""
         try:
-            wacc_sheet = self.workbook_values.get('WACC') or self.workbook_values['DCF']
+            # `workbook_values` is an openpyxl Workbook, which has no .get().
+            # The original `self.workbook_values.get('WACC') or ...` raised
+            # AttributeError on every run, so this check never actually fired --
+            # it degraded into a warning and the WACC was never range-checked.
+            wacc_sheet = (self.workbook_values['WACC']
+                          if 'WACC' in self.workbook_values.sheetnames
+                          else self.workbook_values['DCF'])
             wacc = None
 
             for row in wacc_sheet.iter_rows(max_row=100, max_col=20):

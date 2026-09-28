@@ -835,6 +835,24 @@ To inspect one class by hand: `officecli query model.xlsx "cell[type=Error]"`.
 
 **Fix all errors** and re-run until `count` is 0 before delivering the model.
 
+### DCF logic checks (not covered by `view issues`)
+
+`view issues` checks the *workbook*. These three checks are about the *valuation* and need
+`scripts/validate_dcf.py` (`pip install -r requirements.txt` — it needs openpyxl for cached
+values, which officecli does write):
+
+```bash
+python scripts/validate_dcf.py out/model.xlsx
+```
+
+| Check | What it enforces |
+|---|---|
+| `_check_terminal_growth_vs_wacc` | terminal growth must be < WACC, or the model diverges |
+| `_check_wacc_range` | WACC within a plausible band for the sector |
+| `_check_terminal_value_proportion` | terminal value as % of EV (flag if far outside 50–70%) |
+
+Run it alongside `view issues`, not instead of it.
+
 ### Formatting Standards
 
 **IMPORTANT**: Follow the xlsx skill for formula construction rules and number formatting conventions. The DCF skill adds specific visual presentation standards.
