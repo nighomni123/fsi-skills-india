@@ -393,6 +393,21 @@ Verified 2026-09-28, 11 rows:
 > bucket (7.1679) differ by ~5bp; both are right for their own use, and mixing them silently is
 > exactly the kind of small-but-unexplained drift a reviewer catches.
 
+**⚠️ CCIL returns yields as percentage *numbers*, not decimals.** `zerorate_10` comes back as
+`7.22` and the par YTM as `7.1679`. Write that straight into a cell with an Excel `0.00%` format and
+it displays **716.79%** — a 100× error that looks plausible because the number is right. Verified
+2026-09-29: writing `7.1679` with `numberformat:"0.00%"` read back as `"716.79%"`.
+
+**Convert in a visible formula, don't pre-divide:**
+
+```json
+{"command":"add","parent":"WACC!C2","type":"cell","props":{"formula":"7.1679/100","numberformat":"0.00%"}}
+```
+
+or write the decimal `0.071679` directly. Same discipline as the lakh/crore rule in
+`india-market-conventions`: the scale conversion must be a formula, and the unit must be in the
+label — here `Risk-free rate (9Y-10Y G-sec, %)` with a `0.00%` format.
+
 **3. Money-market rates — a free substitute for FBIL**, which is a closed SPA with no locatable API:
 
 ```

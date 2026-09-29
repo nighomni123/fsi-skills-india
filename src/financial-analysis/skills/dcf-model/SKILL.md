@@ -1062,7 +1062,7 @@ Implied Upside/(Downside),XX%,,,,,
 
 ```csv
 COST OF EQUITY CALCULATION,,
-Risk-Free Rate (9Y-10Y G-sec),X.XX%,[Input - fetch from CCIL; cite security, tenor bucket, date]
+Risk-Free Rate (9Y-10Y G-sec),0.00%,[Input - CCIL returns 7.1679 as a NUMBER; store 0.071679 or divide by 100 in a formula, or it displays 716.79%]
 Beta (5Y monthly),X.XX,[Yellow input]
 Equity Risk Premium,X.XX%,[Yellow input]
 Cost of Equity,X.XX%,[Calculated blue]
