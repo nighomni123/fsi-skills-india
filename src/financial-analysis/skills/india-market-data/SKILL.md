@@ -76,7 +76,14 @@ Base `https://www.nseindia.com/api/<path>`, no key, but Akamai-fronted. **Not un
 | `corporate-board-meetings?index=equities` | works — earnings calendar |
 | `live-analysis-variations?index=gainers&type=FOSec` | works |
 | **`quote-equity?symbol=X`** | **403 Akamai, for every symbol and every header set** — a per-path WAF rule, not a missing-header problem |
-| `historical/*`, `equity-stockIndices`, `corporate-actions`, `corporates-shareholding-pattern` | **404 / 503** — retired |
+| `option-chain-contract-info?symbol=NIFTY` | **works** — 18 expiries + 279 strikes. Warm the cookie from `/option-chain` specifically |
+| `option-chain-v3?type=Indices&symbol=NIFTY&expiry=DD-MMM-YYYY` | **works** — 144 strikes x CE/PE with `impliedVolatility`, `openInterest`, `changeinOpenInterest`, 5-level bid/ask. **`expiry` is mandatory**; omit it and you get `200 {}` |
+| `corporates-corporateActions?index=equities&symbol=X` | **works** — a **bare JSON array** (not wrapped). The retired `corporate-actions` was a *rename*, not a block |
+| `historicalOR/indicesHistory?indexType=NIFTY%2050&from=&to=` | **works** — per-index EOD OHLCV + turnover. Replaces the retired `historical/indicesHistory` |
+| `historicalOR/bulk-block-short-deals?optionType=block_deals&from=&to=` | **works** — `optionType` is **required** or you get a bare 500 |
+| `snapshot-capital-market-largedeal` | **works** — today's bulk/block deals |
+| `equity-stockIndices` | 404 — renamed to `-adu`, which now returns **breadth only** (advances/declines), not constituents |
+| `corporates-shareholding-pattern` | 404 — shareholding is a PDF on nseindia.com; use Screener.in instead |
 
 **Treat `quote-equity` as unavailable.** It is the URL a US-derived scraper tries first, and it is
 the one that fails. Build on bhavcopy and yfinance.
@@ -86,6 +93,79 @@ NSE also publishes a daily index file, no key, no cookie:
 https://nsearchives.nseindia.com/content/indices/ind_close_all_DDMMYYYY.csv
 ```
 Verified back to at least 2018; includes OHLC, P/E, P/B, and div yield per index.
+
+### Index constituents — static CSVs, no auth (the retired endpoint was only renamed)
+
+`equity-stockIndices` 404s, but you do not need it. `nsearchives.nseindia.com` carries constituents
+as CSV, with **no auth, no cookie, no referer** — just a `User-Agent`:
+
+```
+https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv        # 50 rows
+https://nsearchives.nseindia.com/content/indices/ind_niftynext50list.csv    # 50
+https://nsearchives.nseindia.com/content/indices/ind_nifty100list.csv       # 100
+https://nsearchives.nseindia.com/content/indices/ind_niftymidcap150list.csv
+https://nsearchives.nseindia.com/content/indices/ind_niftysmallcap250list.csv
+https://nsearchives.nseindia.com/content/indices/ind_niftybanklist.csv      # + it, pharma, auto, fmcg, psu bank…
+```
+
+Header: `Company Name,Industry,Symbol,Series,ISIN Code` — **carries ISIN**, so it joins straight to
+the security master. Verified NIFTY 50 = exactly 50 rows.
+
+Filename rule: lowercase the `Index Name` from `ind_close_all_*.csv`, strip non-alphanumerics,
+append `list.csv`. The rule hit **26 of 166** published indices — a good guess, not a guarantee, so
+confirm the row count matches the index size.
+
+### Full security master — the most valuable NSE file
+
+```
+https://nsearchives.nseindia.com/content/cm/NSE_CM_security_<DDMMYYYY>.csv.gz
+```
+
+No auth. Verified 2026-09-28: **37,856 rows x 120 fields** — equity, SME, debt, MF and every listed
+derivative contract. Use it for the symbol universe (`master-quote` returns only 210 symbols, not the
+full market). Filter `SctySrs == 'EQ'` and `Sts == 'Active'`; `FinInstrmTp` is empty, so disambiguate
+on `SctySrs`. Ignore the first rows — they contain test/dummy instruments (`011NSETEST`, `DUMMYSAN005`).
+
+A lighter daily alternative carrying the circuit `Band` (1/2/3) that no other free source gives:
+`https://nsearchives.nseindia.com/content/equities/sec_list_<DDMMYYYY>.csv` (3,557 rows).
+
+### Options chain and the India vol surface — SOLVED
+
+```
+# step 1: expiries + strikes
+GET /api/option-chain-contract-info?symbol=NIFTY
+# step 2: the chain. expiry is MANDATORY — omit it and you get 200 {}
+GET /api/option-chain-v3?type=Indices&symbol=NIFTY&expiry=29-Sep-2026
+```
+
+Verified 2026-09-28: 144 strikes x CE/PE, `underlyingValue` 22595.55, each leg carrying
+`impliedVolatility`, `openInterest`, `changeinOpenInterest`, `totalTradedVolume`, and 5-level
+bid/ask. **So a current India vol surface is fully available — the gap in the register is closed.**
+
+Auth is a session cookie, and it must be warmed from **`https://www.nseindia.com/option-chain`
+specifically** — the homepage and other pages do not set a usable one. `/api/underlying-information`
+returns the index and equity universe for looping the chain across underlyings.
+
+**Backfill historical surfaces** from the no-auth F&O bhavcopy (the earlier 404 was a missing
+`.csv.zip` suffix):
+
+```
+https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_<YYYYMMDD>_F_0000.csv.zip
+```
+
+Verified 37,165 rows for one day, `SctySrs` in `STO`/`IDO`/`STF`/`IDF`. It carries `UndrlygPric`,
+`SttlmPric`, `StrkPric`, `OptnTp` and `XpryDt` but **no IV column** — compute Black-76 IV yourself
+across a full historical surface. One file per trading day, no pagination.
+
+### Corporate actions
+
+`corporates-corporateActions?index=equities&symbol=X` (renamed from the retired `corporate-actions`)
+returns a **bare JSON array** with `symbol`, `comp`, `isin`, `series`, `exDate`, `recDate`,
+`bcStartDate`/`bcEndDate`, `ndStartDate`/`ndEndDate`, `faceVal`, `subject`. Dividend, bonus, split,
+rights and buyback all arrive mixed in `subject` — classify by substring. Market-wide works too:
+`&category=dividend|bonus|splits|rights|buyback`.
+
+The legacy static `CA_*.csv` datafiles and the `PR{ddMMMyyyy}.zip` archive are both **404 — retired**.
 
 ### BSE — no usable free API
 
@@ -260,7 +340,84 @@ FRED has **no** India GDP/CPI/reserves series (`INDPGDP`, `INDGDP`, `MKTGDP`, `W
 `/v1/2026-09-18..2026-09-28?base=USD&symbols=INR` gives the full daily series. ECB-backed, keyless,
 **no change needed to the existing FX step**. Reference/mid rates — not tradeable quotes.
 
-### RBI — the hardest gap, and there is no free G-sec feed
+### CCIL — the Indian G-sec curve, FREE (this closes the biggest gap in the register)
+
+The institutional home of Indian G-sec data is **CCIL** (Clearing Corporation of India). The pages
+are plain GETs with **no key, no cookie, no session** — a browser `User-Agent` is all that's needed.
+The earlier "no free source" conclusion came from probing the wrong paths (`/datafile`, `/api/*`);
+the data lives on `/web/ccil/<slug>` pages.
+
+**1. Zero-coupon yield curve (ZCYC) — the best WACC input.** A full daily 0–50Y zero curve at 0.5Y
+granularity, embedded as parseable JSON in the page:
+
+```
+https://www.ccilindia.com/web/ccil/zero-rates
+```
+
+```python
+import re, json, urllib.request
+req = urllib.request.Request(
+    "https://www.ccilindia.com/web/ccil/zero-rates",
+    headers={"User-Agent": "Mozilla/5.0 ..."})
+h = urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "ignore")
+recs = json.loads(re.search(r"var\s+records\s*=\s*(\[\{.*?\}\])", h, re.S).group(1))
+latest = max(recs, key=lambda r: r["date"])      # key is `date`, NOT `zerorate_date`
+gsec_10y = latest["zerorate_10"]                  # 2026-09-28 -> 7.22
+```
+
+Verified 2026-09-28: two records (today + previous business day), `zerorate_10` = **7.22** for
+2026-09-28 and 7.18 for 2026-09-25. A zero curve is the *correct* discount-rate input — it gives
+per-tenor discount factors, which a single par yield cannot.
+
+**2. Tenorwise indicative yields — the par curve, and the benchmark security.**
+
+```
+https://www.ccilindia.com/web/ccil/tenorwise-indicative-yields
+```
+
+Server-rendered `<table id="dtTable">`, 4 columns: `Date | Tenor Bucket | Security | YTM (%)`.
+Verified 2026-09-28, 11 rows:
+
+| Tenor bucket | Security | YTM (%) |
+|---|---|---|
+| 91D | 91 DTB (24/12/2026) | 5.39 |
+| 1Y-2Y | 8.60% GS 2028 | 6.5817 |
+| 4Y-5Y | 6.36% GS 2031 | 6.8821 |
+| **9Y-10Y** | **6.94% GS 2036** | **7.1679** |
+| 13Y-15Y | 7.06% GS 2041 | 7.3621 |
+| 28Y-30Y | 7.63% GS 2056 | 7.6777 |
+
+> **Label the basis.** `9Y-10Y` is a *tenor bucket*, not a single on-the-run 10Y. 7.1679 is the yield
+> on the `6.94% GS 2036` benchmark. A perfectly standard WACC risk-free proxy — but say "9Y-10Y
+> bucket, 6.94% GS 2036" in the source comment, not "the 10Y". The zero rate (7.22) and the par
+> bucket (7.1679) differ by ~5bp; both are right for their own use, and mixing them silently is
+> exactly the kind of small-but-unexplained drift a reviewer catches.
+
+**3. Money-market rates — a free substitute for FBIL**, which is a closed SPA with no locatable API:
+
+```
+https://www.ccilindia.com/web/ccil/money-market-rates-and-volumes-most-liquid-tenor-
+```
+
+Verified 2026-09-28: Call 5.1057, TREP 5.0519, Basket Repo 5.121, Special Repo 5.02, each with
+volume in crore.
+
+**Limitations — real, and they matter.** Both yield pages return **today + previous business day only**.
+The `fromDate`/`toDate` form is a session-bound Liferay portlet and the range is **ignored** without
+sign-in; the page's own JS says *"Please Sign in to download the file"*. So **free access is
+current-values-only; historical curve time series is paid.** That is the ceiling — budget for a paid
+feed only if you need history.
+
+**Cross-check:** TradingEconomics `https://tradingeconomics.com/india/government-bond-yield` embeds
+`{"name":"India 10Y","value":7.183}` — 1.5bp from CCIL's 7.1679 (different definitions). Good sanity
+check, not a primary. Investing.com is **403**; World Government Bonds' India page **301s to a
+glossary** (dead).
+
+**The CCIL data catalogue** — a 7-page unauthenticated PDF mapping 72 legacy files to current URLs,
+the best starting point for anything further:
+`https://www.ccilindia.com/documents/d/ccil/data-statistics-user-guide`
+
+### RBI — HTML only; `dbie.rbihub.in` is a stale mirror
 
 Tested hard; this is a genuine negative.
 
@@ -276,10 +433,12 @@ and yields a **policy repo rate 5.25% (Jul 2026)**, CPI 4.38% (Jun 2026), real G
 FX reserves $785.7bn. **Cite it as `dbie.rbihub.in (RBI DBIE mirror)`, not as RBI**, and expect it
 to break.
 
-**Consequence for WACC — the important part:** there is **no free Indian 10Y G-sec yield**. Make the
-risk-free rate a **required manual input** sourced from the RBI WSS HTML for the valuation date, or
-ask the user. Do not let an agent invent one. A repo-rate proxy is defensible only if labelled a
-proxy, never a G-sec. See `NOT-ADAPTABLE.md` section 3.11.
+**Use CCIL, not RBI.** The RBI path is HTML-only and `dbie.rbihub.in` is a third-party mirror
+whose 10-year G-sec tile is **two months stale** (6.84% for Jul 2026 against CCIL's live 7.17%) — the
+gap is staleness, not a data conflict. For the risk-free rate in a WACC, pull the **live 9Y-10Y
+bucket from CCIL**, record the security and date in the source comment, and keep the tenor-bucket
+label visible. If CCIL is unreachable, say the risk-free rate could not be sourced — do not fall back
+to a stale tile or a repo rate without labelling it a proxy.
 
 ### MOSPI / NSO — not machine-readable
 

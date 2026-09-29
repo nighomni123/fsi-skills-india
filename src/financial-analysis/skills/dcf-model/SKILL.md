@@ -226,9 +226,17 @@ EBIT
 Cost of Equity = Risk-Free Rate + Beta × Equity Risk Premium
 
 Where:
-- Risk-Free Rate = **current 10-year Indian government security (G-sec) yield**, not a US Treasury yield.
-  There is no free streaming G-sec feed — read the 10Y off an RBI/NSE curve for the valuation date,
-  and record it as a sourced input with its date. A stale gilt rate silently moves every valuation.
+- Risk-Free Rate = **current Indian G-sec yield, not a US Treasury yield.** Fetch it free from
+  **CCIL**, and do not hardcode it:
+  - Zero curve (best): `https://www.ccilindia.com/web/ccil/zero-rates` — JSON in the page, key
+    `zerorate_10` = 10-year zero. A zero curve is the correct discount-rate input.
+  - Par curve: `https://www.ccilindia.com/web/ccil/tenorwise-indicative-yields` — take the `9Y-10Y`
+    row (verified 2026-09-28: `6.94% GS 2036` at 7.1679%).
+
+  **Label the basis in the source comment** — "9Y-10Y bucket, 6.94% GS 2036, CCIL, 2026-09-28" — not
+  bare "10Y". It is a tenor bucket, not an on-the-run bond. Record the date: these pages give today
+  and the previous business day only, so a stale gilt silently moves every valuation. Full recipe in
+  `india-market-data`.
 - Beta = 5-year monthly stock beta vs **NIFTY 50** (state the index — NIFTY 50 and the BSE Sensex are
   different indices, and neither is the S&P 500; a US-computed beta is not a substitute).
 - Equity Risk Premium = 5.0-6.0% (market standard). This is a judgement input: state the basis and
@@ -753,7 +761,8 @@ In addition, be aware of these errors:
 - Mixing book and market values in capital structure
 - Using equity beta instead of asset/unlevered beta incorrectly
 - Wrong tax rate application to cost of debt
-- Incorrect risk-free rate — in an Indian model this must be the current 10Y **G-sec**, not a US 10Y Treasury, and must be dated
+- Incorrect risk-free rate — must be the current **G-sec from CCIL**, not a US 10Y Treasury, and must be dated and basis-labelled
+- Hardcoding the risk-free rate instead of fetching it — the gilt curve moves; a stale rate re-rates the whole company
 - Failure to adjust for net debt vs net cash position
 
 ### Growth Assumption Flaws
@@ -1053,7 +1062,7 @@ Implied Upside/(Downside),XX%,,,,,
 
 ```csv
 COST OF EQUITY CALCULATION,,
-Risk-Free Rate (10Y G-sec),X.XX%,[Yellow input - cite RBI/NSE curve + date]
+Risk-Free Rate (9Y-10Y G-sec),X.XX%,[Input - fetch from CCIL; cite security, tenor bucket, date]
 Beta (5Y monthly),X.XX,[Yellow input]
 Equity Risk Premium,X.XX%,[Yellow input]
 Cost of Equity,X.XX%,[Calculated blue]
