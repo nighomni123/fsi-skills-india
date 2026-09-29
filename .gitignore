@@ -1,6 +1,4 @@
 __pycache__/
 .DS_Store
 # archify visual-check captures: regenerable evidence, not source
-docs/*.visual-check.png
-docs/*.visual-check.json
-docs/*.visual-check.html
+docs/*.visual-check.*
