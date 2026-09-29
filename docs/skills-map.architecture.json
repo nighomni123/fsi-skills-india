@@ -1,0 +1,278 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "fsi-skills-india — 63 skills, how they group and overlap",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1320,
+      468
+    ]
+  },
+  "components": [
+    {
+      "id": "data_india",
+      "type": "database",
+      "label": "Free India data",
+      "sublabel": "NSE bhavcopy · CCIL · yfinance · Screener",
+      "pos": [
+        56,
+        20
+      ],
+      "size": [
+        280,
+        74
+      ]
+    },
+    {
+      "id": "data_global",
+      "type": "database",
+      "label": "Global free stack",
+      "sublabel": "SEC EDGAR · FRED · Treasury · Frankfurter",
+      "pos": [
+        356,
+        20
+      ],
+      "size": [
+        280,
+        74
+      ]
+    },
+    {
+      "id": "india_overlay",
+      "type": "security",
+      "label": "India overlay — every public-market skill passes through it",
+      "sublabel": "FY Apr–Mar · lakh/crore · Ind AS · SEBI LODR",
+      "pos": [
+        56,
+        138
+      ],
+      "size": [
+        796,
+        78
+      ]
+    },
+    {
+      "id": "g_fa",
+      "type": "backend",
+      "label": "Financial analysis (13)",
+      "tag": "13",
+      "sublabel": "model, comps, returns",
+      "pos": [
+        56,
+        258
+      ],
+      "size": [
+        190,
+        82
+      ]
+    },
+    {
+      "id": "g_er",
+      "type": "backend",
+      "label": "Equity research (9)",
+      "tag": "9",
+      "sublabel": "coverage, notes",
+      "pos": [
+        258,
+        258
+      ],
+      "size": [
+        190,
+        82
+      ]
+    },
+    {
+      "id": "g_ib",
+      "type": "backend",
+      "label": "Investment banking (9)",
+      "tag": "9",
+      "sublabel": "pitch, CIM, process",
+      "pos": [
+        460,
+        258
+      ],
+      "size": [
+        190,
+        82
+      ]
+    },
+    {
+      "id": "g_pe",
+      "type": "backend",
+      "label": "Private equity (10)",
+      "tag": "10",
+      "sublabel": "screen, diligence, IC",
+      "pos": [
+        662,
+        258
+      ],
+      "size": [
+        190,
+        82
+      ]
+    },
+    {
+      "id": "g_admin",
+      "type": "backend",
+      "label": "Fund admin (6)",
+      "tag": "6",
+      "sublabel": "close, reconcile",
+      "pos": [
+        864,
+        258
+      ],
+      "size": [
+        190,
+        82
+      ]
+    },
+    {
+      "id": "g_ops",
+      "type": "backend",
+      "label": "Operations (2)",
+      "tag": "2",
+      "sublabel": "KYC, rules",
+      "pos": [
+        1066,
+        258
+      ],
+      "size": [
+        190,
+        82
+      ]
+    },
+    {
+      "id": "toolchain",
+      "type": "backend",
+      "label": "Authoring toolchain — every file deliverable passes through here",
+      "sublabel": "xlsx-author · pptx-author · audit-xls",
+      "pos": [
+        56,
+        384
+      ],
+      "size": [
+        796,
+        78
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Public-market skills",
+      "wraps": [
+        "india_overlay",
+        "g_fa",
+        "g_er",
+        "g_ib",
+        "g_pe"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Firm-internal (ported unchanged)",
+      "wraps": [
+        "g_admin",
+        "g_ops"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "e_data_india",
+      "from": "data_india",
+      "to": "india_overlay",
+      "label": "India sources",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e_data_global",
+      "from": "data_global",
+      "to": "india_overlay",
+      "label": "global fallback",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e_ov_fa",
+      "from": "india_overlay",
+      "to": "g_fa",
+      "label": "FY, units, WACC",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e_ov_er",
+      "from": "india_overlay",
+      "to": "g_er",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e_ov_ib",
+      "from": "india_overlay",
+      "to": "g_ib",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e_ov_pe",
+      "from": "india_overlay",
+      "to": "g_pe",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e_tc_fa",
+      "from": "toolchain",
+      "to": "g_fa",
+      "label": "builds and audits files",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "e_tc_ib",
+      "from": "toolchain",
+      "to": "g_ib",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Cross-cutting — the 5 skills every group leans on",
+      "items": [
+        "xlsx-author — any workbook via officecli: blue/black/green, formulas not hardcodes, crore by formula, view-issues gate",
+        "pptx-author — any deck: one idea per slide, numbers footnoted to a cell, screenshot + outline QA",
+        "audit-xls — pre-delivery: formula errors, hidden hardcodes, broken links, BS balance and cash tie",
+        "india-market-conventions + india-market-data — FY, units, Ind AS, SEBI LODR, free source inventory"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Where they overlap",
+      "items": [
+        "Valuation three times: comps-analysis (peers), dcf-model (intrinsic), returns-analysis (cash-on-cash) — one model layer, three questions",
+        "Equity research ships twice: 9 workflow vs 11 source skills; earnings-preview vs -beta is one task at two depths",
+        "ic-memo, pitch-deck and cim-builder assemble the same exhibits — only the narrative differs",
+        "Fund admin (6) and KYC (2) sit outside the overlay: the ERP already runs in India"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Use cases, and the gaps we name instead of filling",
+      "items": [
+        "Value a company — dcf-model on live CCIL 9Y-10Y, beta vs NIFTY 50, cross-checked with comps-analysis; pre-earnings — earnings-preview-beta or -preview, then earnings-analysis",
+        "Sell-side — datapack-builder, pitch-deck, cim-builder, teaser; fund a deal — deal-screening, dd-checklist, returns-analysis, ic-memo; month-end — accruals, roll-forward, gl-recon, nav-tieout",
+        "Six gaps stay open and are named, not filled: private funding, pledge series, SENSEX constituents, MOSPI monthly, segments, credit spreads",
+        "CCIL gives live G-sec but no history; yfinance consensus is thin on small caps — both stated in-skill"
+      ]
+    }
+  ]
+}
