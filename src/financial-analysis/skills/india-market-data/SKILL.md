@@ -71,7 +71,7 @@ Base `https://www.nseindia.com/api/<path>`, no key, but Akamai-fronted. **Not un
 | `allIndices` | **works** — verified NIFTY 50 last 22780.25, P/E 19.26, P/B 2.75; INDIA VIX 13.69 |
 | `marketStatus` | works |
 | `master-quote` | works — but a **flat symbol list (210 symbols)**, *not* the full 3,654 universe, and **not** index membership |
-| `corporate-announcements?index=equities&symbol=X` | **works** — verified 3,353 records for RELIANCE with `desc`, `attchmntText`, `attchmntFile` (PDF URL). This is the EDGAR-`submissions` analogue. Referer `https://www.nseindia.com/companies-listing/corporate-filings` |
+| `corporate-announcements?index=equities&from_date=DD-MM-YYYY&to_date=DD-MM-YYYY` | **works** — verified 14,952 records / 10.5 MB for Sep-2026, **>=5 years history, no pagination, no key**. The EDGAR-`submissions` analogue. Referer `https://www.nseindia.com/companies-listing/corporate-filings`. Filter on `desc` **client-side** — the server ignores `type`/`category` and returns everything |
 | `corporates-financial-results?index=equities&symbol=X` | works — result filings |
 | `corporate-board-meetings?index=equities` | works — earnings calendar |
 | `live-analysis-variations?index=gainers&type=FOSec` | works |
@@ -166,6 +166,35 @@ rights and buyback all arrive mixed in `subject` — classify by substring. Mark
 `&category=dividend|bonus|splits|rights|buyback`.
 
 The legacy static `CA_*.csv` datafiles and the `PR{ddMMMyyyy}.zip` archive are both **404 — retired**.
+
+### Filtering `corporate-announcements` — measured, not assumed
+
+Verified 2026-09-28 on one month: **14,952 records, 104 distinct `desc` values.** So `desc` is a
+*controlled* event-type vocabulary (not free text), but it is **large and window-dependent**, and most
+of it is routine noise rather than an economic event:
+
+| `desc` | count (Sep-2026) |
+|---|---|
+| Shareholders meeting | 2,713 |
+| Trading Window | 1,894 |
+| General Updates | 1,703 |
+| Analysts/Institutional Investor Meet | 1,703 |
+| Copy of Newspaper Publication | 1,416 |
+| Preferential issue / Qualified Institutional Placement | small, but clean and filterable |
+| Acquisition / Amalgamation-Merger / Scheme of Arrangement | filterable |
+| Disclosure under SEBI Takeover Regulations | ~66/month |
+
+Do not hardcode a fixed list of `desc` values — 104 appear in one month, 239 across six quarters.
+Filter for the economic event you want and expect the rest to be noise.
+
+**Two failure modes that produce a digest full of holes:**
+
+1. **Throttling returns `{"data":[],"msg":"no data found"}` with HTTP 200.** A naive scraper reads
+   that as "nothing happened this month" and silently drops real deals. Always guard:
+   `if not isinstance(r, list) or not r: raise SystemExit("throttled - do not report a zero month")`
+2. **Session cookies expire within minutes**, and **Python `urllib` is blocked by NSE where `curl`
+   passes.** Pace at ~15 s, re-warm the jar per run, retry PDFs up to 3x, and keep date windows to
+   about a quarter — a multi-year window returns the empty envelope even with a valid session.
 
 ### BSE — no usable free API
 
@@ -294,6 +323,51 @@ practical free source for shareholding pattern and promoter trends.
 
 Not bot-blocked, but no contract and no export (a free account exists; export is premium). Be
 polite, cache hard. Use `lxml` / `beautifulsoup4` rather than regex.
+
+### Per-holder shareholding — an undocumented free API
+
+Screener.in's shareholding chart is driven by a JSONP-style endpoint returning a **per-entity
+quarterly series**. No auth, no key, no account:
+
+    https://www.screener.in/api/3/{companyId}/investors/{classification}/{period}/
+
+`companyId` is **Screener's own internal id**, not the BSE scrip code. Pull it off the company page:
+
+    curl -s -A "$UA" "https://www.screener.in/company/RELIANCE/consolidated/" \
+      | grep -oE 'data-company-id="[0-9]+"'          # -> 2726 for RELIANCE
+
+Verified 2026-09-29 — RELIANCE `promoters/quarterly` returns **56 named promoter entities** as a
+dict keyed by entity name, each mapping quarter -> % of paid-up capital:
+
+    holders = {k: v for k, v in d.items() if isinstance(v, dict) and k != "setAttributes"}
+
+Three things that will bite:
+
+- **`setAttributes` is mixed in as a key** alongside the entity names. Filter it out, or it pollutes
+  every iteration and any sum over the values.
+- **The valid classifications are `promoters`, `government`, `public`.** Not `fii` / `dii` — those
+  return `0` entities, which looks like missing data rather than an invalid path. Aggregate FII/DII
+  splits are only in the shareholding table, not here.
+- **Thresholded at roughly 1%**, so the long tail is absent. A promoter who fell below 1% simply
+  disappears — that is a drop-out, not a disposal. Do not read a shrinking entity list as promoters
+  exiting.
+
+### Promoter pledge — confirmed no free series
+
+Checked hard. There is **no** free structured pledge source:
+
+- The NSE `desc` vocabulary has **no pledge category**. Pledge arrives as a generic event
+  (`Disclosure under SEBI Takeover Regulations`, Reg 29) with numbers only in the attached PDF.
+- Volume is tiny: **3 pledge-matching records in a whole month** across all equities. It is a
+  **sparse event stream, not a time series** — you can report "X disclosed a pledge change on
+  <date>", but you **cannot** produce a current "pledged % of promoter holding" without parsing
+  filings one by one.
+- Screener.in has no pledge data; Trendlyne and StockEdge are login-walled.
+
+Promoter pledging is a first-order Indian risk signal, so the honest treatment is: state that the
+pledged share count is **not available free**, name the filings to check, and escalate to the user.
+Do not report a pledge figure from a partial scrape — and do not read "no filing found" as "no
+pledge": absence of a filing is not absence of a pledge.
 
 ---
 
